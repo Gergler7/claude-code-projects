@@ -24,6 +24,10 @@
     --accent-wash:    rgba(42,120,214,0.10);
     --neg-wash:       rgba(227,73,72,0.10);
     --hover-wash:     rgba(11,11,11,0.04);
+    --vix-calm:       #9ec5f4;   /* sequential step 200 */
+    --vix-normal:     #2a78d6;   /* sequential step 450 */
+    --vix-high:       #104281;   /* sequential step 650 */
+    --vix-track:      #e1e0d9;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) .viz-root {
@@ -44,6 +48,10 @@
       --accent-wash:    rgba(57,135,229,0.12);
       --neg-wash:       rgba(230,103,103,0.12);
       --hover-wash:     rgba(255,255,255,0.05);
+      --vix-calm:       #6da7ec;
+      --vix-normal:     #3987e5;
+      --vix-high:       #1c5cab;
+      --vix-track:      #2c2c2a;
     }
   }
   :root[data-theme="dark"] .viz-root {
@@ -64,6 +72,10 @@
     --accent-wash:    rgba(57,135,229,0.12);
     --neg-wash:       rgba(230,103,103,0.12);
     --hover-wash:     rgba(255,255,255,0.05);
+    --vix-calm:       #6da7ec;
+    --vix-normal:     #3987e5;
+    --vix-high:       #1c5cab;
+    --vix-track:      #2c2c2a;
   }
 
   /* ---------- layout ---------- */
@@ -189,6 +201,16 @@
   .foot-note {
     grid-column: 1 / -1; color: var(--text-muted); font-size: 11.5px; margin-top: 4px;
   }
+
+  /* VIX conditions banner */
+  .vix-flex { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+  .vix-value-block { flex: 0 0 auto; }
+  .vix-value { font-size: 34px; font-weight: 650; line-height: 1.1; margin: 2px 0 3px; }
+  .vix-zone { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); }
+  .vix-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .vix-meter-block { flex: 1 1 320px; min-width: 240px; }
+  .vix-legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 6px; font-size: 11.5px; color: var(--text-muted); }
+  .vix-legend .lk { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 </style>
 </head>
 <body class="viz-root">
@@ -211,6 +233,26 @@
 
   <!-- KPI row -->
   <div class="tiles" id="tiles"></div>
+
+  <!-- VIX conditions -->
+  <section class="card span-12">
+    <h2>VIX — is it a good time to sell premium?</h2>
+    <div class="h2sub">CBOE Volatility Index · your bands: 10–15 calm, 15–20 normal, 25–40 high (good premiums)</div>
+    <div class="vix-flex">
+      <div class="vix-value-block">
+        <div class="vix-value" id="vix-value">—</div>
+        <div class="vix-zone"><span class="vix-dot" id="vix-dot"></span><span id="vix-zone-text"></span></div>
+      </div>
+      <div class="vix-meter-block">
+        <svg id="vix-meter" width="100%" height="60" role="img" aria-label="VIX gauge against calm, normal, and high-volatility bands"></svg>
+        <div class="vix-legend">
+          <span><span class="lk" style="background:var(--vix-calm)"></span>10–15 Calm</span>
+          <span><span class="lk" style="background:var(--vix-normal)"></span>15–20 Normal</span>
+          <span><span class="lk" style="background:var(--vix-high)"></span>25–40 High vol · good premiums</span>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- P&L curve -->
   <section class="card span-8">
@@ -293,7 +335,7 @@ function mockData() {
   ];
   positions.forEach(p => p.pnl = Math.round((p.mark - p.entry) * 100 * p.qty));
   return {
-    curve, positions,
+    curve, positions, vix: 27.3,
     account: { netLiq: 84760, dayPnl: +642, openPnl: positions.reduce((s,p)=>s+p.pnl,0),
                buyingPower: 31240,
                delta: positions.reduce((s,p)=>s+p.delta,0),
@@ -345,6 +387,60 @@ function renderTiles() {
     }
     wrap.append(d);
   }
+}
+
+/* ---------- VIX conditions meter ---------- */
+const VIX_BANDS = [
+  { lo: 10, hi: 15, colorVar: "--vix-calm",   note: "10–15" },
+  { lo: 15, hi: 20, colorVar: "--vix-normal", note: "15–20" },
+  { lo: 25, hi: 40, colorVar: "--vix-high",   note: "25–40" },
+];
+function vixZone(v) {
+  if (v < 10) return { name: "Very calm",  note: "below your calm band", swatch: "--text-muted" };
+  if (v < 15) return { name: "Calm",       note: "10–15 · low premiums", swatch: "--vix-calm" };
+  if (v < 20) return { name: "Normal",     note: "15–20 · moderate premiums", swatch: "--vix-normal" };
+  if (v < 25) return { name: "Elevated",   note: "20–25 · between your bands", swatch: "--text-muted" };
+  if (v <= 40) return { name: "High vol",  note: "25–40 · good premiums", swatch: "--vix-high" };
+  return { name: "Extreme", note: "above 40 · outsized risk", swatch: "--bad-text" };
+}
+function renderVix() {
+  const v = DATA.vix;
+  const zone = vixZone(v);
+  document.getElementById("vix-value").textContent = v.toFixed(1);
+  document.getElementById("vix-dot").style.background = css(zone.swatch);
+  document.getElementById("vix-zone-text").textContent = `${zone.name} — ${zone.note}`;
+
+  const svg = document.getElementById("vix-meter");
+  svg.textContent = "";
+  const W = svg.clientWidth, H = +svg.getAttribute("height");
+  const m = { t: 6, r: 28, b: 20, l: 28 };
+  const iw = W - m.l - m.r;
+  const scaleMin = 5, scaleMax = 45;
+  const x = val => m.l + (val - scaleMin) / (scaleMax - scaleMin) * iw;
+  const barY = 14, barH = 14, rr = 4;
+
+  // base track
+  svg.append(el("rect", { x: m.l, y: barY, width: iw, height: barH, rx: rr, ry: rr, fill: css("--vix-track") }));
+
+  // colored bands, inset 1px at touching edges for the 2px surface gap
+  for (const b of VIX_BANDS) {
+    const x0 = x(b.lo), x1 = x(b.hi);
+    const touchesLeft  = VIX_BANDS.some(o => o !== b && o.hi === b.lo);
+    const touchesRight = VIX_BANDS.some(o => o !== b && o.lo === b.hi);
+    const gx0 = x0 + (touchesLeft ? 1 : 0), gx1 = x1 - (touchesRight ? 1 : 0);
+    svg.append(el("rect", { x: gx0, y: barY, width: Math.max(0, gx1 - gx0), height: barH,
+      rx: rr, ry: rr, fill: css(b.colorVar) }));
+    const t0 = el("text", { x: x0, y: barY + barH + 14, "text-anchor": "middle" });
+    t0.textContent = b.lo; svg.append(t0);
+  }
+  const tEnd = el("text", { x: x(40), y: barY + barH + 14, "text-anchor": "middle" });
+  tEnd.textContent = "40"; svg.append(tEnd);
+
+  // current-value marker: connector + 8px ringed dot above the track
+  const mx = Math.max(x(scaleMin), Math.min(x(scaleMax), x(v)));
+  svg.append(el("line", { x1: mx, x2: mx, y1: m.t, y2: barY, stroke: css("--text-primary"), "stroke-width": 2 }));
+  svg.append(el("circle", { cx: mx, cy: m.t, r: 6, fill: css("--surface-1") }));
+  svg.append(el("circle", { cx: mx, cy: m.t, r: 4, fill: css("--text-primary") }));
 }
 
 /* ---------- cumulative P&L line chart ---------- */
@@ -619,6 +715,7 @@ function renderTable() {
 /* ---------- boot & wiring ---------- */
 let currentRange = 90;
 renderTiles();
+renderVix();
 renderTable();
 renderDelta();
 renderPnl(currentRange);
@@ -635,10 +732,10 @@ document.getElementById("strategy").addEventListener("change", e => renderPayoff
 // re-render charts on resize / theme change
 let rt; window.addEventListener("resize", () => {
   clearTimeout(rt);
-  rt = setTimeout(() => { renderPnl(currentRange); renderPayoff(document.getElementById("strategy").value); renderDelta(); }, 150);
+  rt = setTimeout(() => { renderPnl(currentRange); renderPayoff(document.getElementById("strategy").value); renderDelta(); renderVix(); }, 150);
 });
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  renderPnl(currentRange); renderPayoff(document.getElementById("strategy").value); renderDelta();
+  renderPnl(currentRange); renderPayoff(document.getElementById("strategy").value); renderDelta(); renderVix();
 });
 </script>
 </body>
