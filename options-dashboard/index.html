@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Options Trading Dashboard — Template</title>
+<style>
+  /* ---------- theme tokens ---------- */
+  .viz-root {
+    color-scheme: light;
+    --page:           #f9f9f7;
+    --surface-1:      #fcfcfb;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6;   /* blue — primary series */
+    --pos:            #2a78d6;   /* diverging + pole (profit) */
+    --neg:            #e34948;   /* diverging − pole (loss)   */
+    --good-text:      #006300;   /* delta text, up-is-good    */
+    --bad-text:       #d03b3b;
+    --accent-wash:    rgba(42,120,214,0.10);
+    --neg-wash:       rgba(227,73,72,0.10);
+    --hover-wash:     rgba(11,11,11,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --page:           #0d0d0d;
+      --surface-1:      #1a1a19;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --pos:            #3987e5;
+      --neg:            #e66767;
+      --good-text:      #0ca30c;
+      --bad-text:       #e66767;
+      --accent-wash:    rgba(57,135,229,0.12);
+      --neg-wash:       rgba(230,103,103,0.12);
+      --hover-wash:     rgba(255,255,255,0.05);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --page:           #0d0d0d;
+    --surface-1:      #1a1a19;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --pos:            #3987e5;
+    --neg:            #e66767;
+    --good-text:      #0ca30c;
+    --bad-text:       #e66767;
+    --accent-wash:    rgba(57,135,229,0.12);
+    --neg-wash:       rgba(230,103,103,0.12);
+    --hover-wash:     rgba(255,255,255,0.05);
+  }
+
+  /* ---------- layout ---------- */
+  * { box-sizing: border-box; margin: 0; }
+  body.viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    padding: 20px clamp(12px, 3vw, 32px) 48px;
+  }
+  header.top {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  header.top h1 { font-size: 19px; font-weight: 650; }
+  header.top .sub { color: var(--text-muted); font-size: 12.5px; }
+  .demo-badge {
+    font-size: 11px; font-weight: 600; letter-spacing: .04em;
+    color: var(--text-secondary); border: 1px solid var(--border);
+    border-radius: 999px; padding: 2px 9px; background: var(--surface-1);
+  }
+
+  /* filter row — one row above everything it scopes */
+  .filters {
+    display: flex; gap: 6px; align-items: center;
+    margin: 14px 0 18px;
+  }
+  .filters .flabel { color: var(--text-muted); font-size: 12.5px; margin-right: 4px; }
+  .range-btn {
+    font: inherit; font-size: 12.5px; font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 7px; padding: 4px 12px; cursor: pointer;
+  }
+  .range-btn:hover { background: var(--hover-wash); }
+  .range-btn[aria-pressed="true"] {
+    color: var(--text-primary); font-weight: 650;
+    border-color: var(--baseline);
+  }
+
+  .grid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(12, 1fr);
+  }
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    min-width: 0;
+  }
+  .card h2 {
+    font-size: 13px; font-weight: 600; color: var(--text-secondary);
+    margin-bottom: 2px;
+  }
+  .card .h2sub { font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px; }
+
+  /* stat tiles */
+  .tiles { grid-column: 1 / -1; display: grid; gap: 14px;
+           grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  .tile .label { font-size: 12.5px; color: var(--text-secondary); }
+  .tile .value { font-size: 26px; font-weight: 600; margin: 2px 0 1px; }
+  .tile .delta { font-size: 12.5px; font-weight: 550; }
+  .tile .delta.up   { color: var(--good-text); }
+  .tile .delta.down { color: var(--bad-text); }
+  .tile .delta .vs  { color: var(--text-muted); font-weight: 400; }
+
+  .span-8 { grid-column: span 8; }
+  .span-4 { grid-column: span 4; }
+  .span-6 { grid-column: span 6; }
+  .span-12 { grid-column: 1 / -1; }
+  @media (max-width: 900px) {
+    .span-8, .span-4, .span-6 { grid-column: 1 / -1; }
+  }
+
+  svg text {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 11px; fill: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .chart-wrap { position: relative; }
+
+  /* tooltip */
+  .tip {
+    position: absolute; pointer-events: none; display: none;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.14);
+    font-size: 12px; min-width: 130px; z-index: 5;
+  }
+  .tip .tdate { color: var(--text-muted); margin-bottom: 4px; font-size: 11.5px; }
+  .tip .trow { display: flex; align-items: center; gap: 7px; }
+  .tip .key { width: 12px; height: 0; border-top: 2px solid var(--series-1); border-radius: 2px; }
+  .tip .tval { font-weight: 650; font-variant-numeric: tabular-nums; }
+  .tip .tname { color: var(--text-secondary); }
+
+  /* positions table */
+  .tbl-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; white-space: nowrap; }
+  th, td { text-align: right; padding: 7px 12px; font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child,
+  th:nth-child(2), td:nth-child(2) { text-align: left; }
+  thead th {
+    font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+    border-bottom: 1px solid var(--baseline);
+    position: sticky; top: 0; background: var(--surface-1);
+  }
+  tbody td { border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+  tbody tr:hover { background: var(--hover-wash); }
+  td.pnl.up   { color: var(--good-text); font-weight: 550; }
+  td.pnl.down { color: var(--bad-text); font-weight: 550; }
+  .sym { font-weight: 650; }
+  .strat { color: var(--text-secondary); }
+
+  /* payoff strategy select */
+  select {
+    font: inherit; font-size: 12.5px; color: var(--text-primary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 7px; padding: 3px 8px;
+  }
+  .foot-note {
+    grid-column: 1 / -1; color: var(--text-muted); font-size: 11.5px; margin-top: 4px;
+  }
+</style>
+</head>
+<body class="viz-root">
+
+<header class="top">
+  <h1>Options dashboard</h1>
+  <span class="demo-badge">TEMPLATE · MOCK DATA</span>
+  <span class="sub" id="asof"></span>
+</header>
+
+<div class="filters" role="group" aria-label="Time range">
+  <span class="flabel">Range</span>
+  <button class="range-btn" data-days="7">1W</button>
+  <button class="range-btn" data-days="30">1M</button>
+  <button class="range-btn" data-days="90" aria-pressed="true">3M</button>
+  <button class="range-btn" data-days="180">6M</button>
+</div>
+
+<div class="grid">
+
+  <!-- KPI row -->
+  <div class="tiles" id="tiles"></div>
+
+  <!-- P&L curve -->
+  <section class="card span-8">
+    <h2>Cumulative P&amp;L</h2>
+    <div class="h2sub" id="pnl-sub"></div>
+    <div class="chart-wrap">
+      <svg id="pnl-chart" width="100%" height="260" role="img" aria-label="Cumulative profit and loss over the selected range"></svg>
+      <div class="tip" id="pnl-tip"></div>
+    </div>
+  </section>
+
+  <!-- Payoff diagram -->
+  <section class="card span-4">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>Payoff at expiration</span>
+      <select id="strategy" aria-label="Strategy">
+        <option value="ironCondor">Iron condor</option>
+        <option value="longCall">Long call</option>
+        <option value="coveredCall">Covered call</option>
+        <option value="longStraddle">Long straddle</option>
+        <option value="bullPutSpread">Bull put spread</option>
+      </select>
+    </h2>
+    <div class="h2sub" id="payoff-sub"></div>
+    <div class="chart-wrap">
+      <svg id="payoff-chart" width="100%" height="220" role="img" aria-label="Strategy payoff at expiration"></svg>
+      <div class="tip" id="payoff-tip"></div>
+    </div>
+  </section>
+
+  <!-- Delta exposure -->
+  <section class="card span-4">
+    <h2>Delta exposure by underlying</h2>
+    <div class="h2sub">Share-equivalent deltas · positive = long</div>
+    <svg id="delta-chart" width="100%" height="240" role="img" aria-label="Delta exposure by underlying"></svg>
+  </section>
+
+  <!-- Positions table -->
+  <section class="card span-8">
+    <h2>Open positions</h2>
+    <div class="h2sub">Marks and Greeks are placeholder values</div>
+    <div class="tbl-scroll">
+      <table id="positions">
+        <thead><tr>
+          <th>Symbol</th><th>Strategy</th><th>Exp</th><th>DTE</th><th>Qty</th>
+          <th>Entry</th><th>Mark</th><th>P&amp;L</th><th>Δ</th><th>Θ/day</th><th>IV</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="foot-note">Template with generated placeholder data — wire your broker API in <code>mockData()</code>. Not investment advice.</p>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   MOCK DATA — replace this block with your broker/API feed
+   ========================================================= */
+function mockData() {
+  // deterministic pseudo-random equity curve (180 days)
+  let seed = 42;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const days = 180, curve = [];
+  let cum = 0;
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    cum += (rnd() - 0.44) * 900;                    // slight positive drift
+    curve.push({ date: d, pnl: Math.round(cum) });
+  }
+  const positions = [
+    { sym:"SPY",  strat:"Iron condor 545/550/580/585", exp:"2026-08-21", dte:35, qty:-2, entry:1.85, mark:1.22, delta:-4,   theta:+6.1,  iv:0.14 },
+    { sym:"NVDA", strat:"Long call 190C",              exp:"2026-09-18", dte:63, qty:+3, entry:8.40, mark:11.15,delta:+168, theta:-14.2, iv:0.42 },
+    { sym:"AAPL", strat:"Covered call 240C",           exp:"2026-08-07", dte:21, qty:-1, entry:3.10, mark:2.05, delta:+62,  theta:+4.8,  iv:0.22 },
+    { sym:"TSLA", strat:"Bull put spread 300/290",     exp:"2026-08-21", dte:35, qty:-2, entry:2.40, mark:1.65, delta:+24,  theta:+5.5,  iv:0.51 },
+    { sym:"QQQ",  strat:"Long straddle 495",           exp:"2026-07-31", dte:14, qty:+1, entry:9.80, mark:8.35, delta:+7,   theta:-22.4, iv:0.19 },
+    { sym:"AMD",  strat:"Cash-secured put 150P",       exp:"2026-09-18", dte:63, qty:-1, entry:4.20, mark:3.10, delta:+31,  theta:+3.2,  iv:0.38 },
+  ];
+  positions.forEach(p => p.pnl = Math.round((p.mark - p.entry) * 100 * p.qty));
+  return {
+    curve, positions,
+    account: { netLiq: 84760, dayPnl: +642, openPnl: positions.reduce((s,p)=>s+p.pnl,0),
+               buyingPower: 31240,
+               delta: positions.reduce((s,p)=>s+p.delta,0),
+               theta: +Math.round(positions.reduce((s,p)=>s+p.theta,0)*10)/10 }
+  };
+}
+const DATA = mockData();
+
+/* ---------- formatting helpers ---------- */
+const fmt$  = n => (n<0?"-$":"$") + Math.abs(n).toLocaleString("en-US");
+const fmt$2 = n => (n<0?"-$":"$") + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtD  = d => d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+const el = (tag, attrs={}) => {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+};
+const css = v => getComputedStyle(document.body).getPropertyValue(v).trim();
+
+document.getElementById("asof").textContent =
+  "As of " + new Date().toLocaleDateString("en-US",{weekday:"short",month:"long",day:"numeric",year:"numeric"});
+
+/* ---------- KPI tiles ---------- */
+function renderTiles() {
+  const a = DATA.account;
+  const tiles = [
+    { label:"Net liquidation value", value: fmt$(a.netLiq) },
+    { label:"Day P&L",   value: fmt$(a.dayPnl),  delta: a.dayPnl,  vs:"vs yesterday close" },
+    { label:"Open P&L",  value: fmt$(a.openPnl), delta: a.openPnl, vs:"on open positions" },
+    { label:"Buying power", value: fmt$(a.buyingPower) },
+    { label:"Portfolio delta", value: (a.delta>0?"+":"") + a.delta + " Δ" },
+    { label:"Portfolio theta", value: fmt$(a.theta) + "/day", delta: a.theta,
+      vs: a.theta >= 0 ? "decay collected" : "decay paid" },
+  ];
+  const wrap = document.getElementById("tiles");
+  for (const t of tiles) {
+    const d = document.createElement("div");
+    d.className = "card tile";
+    const l = document.createElement("div"); l.className="label"; l.textContent = t.label;
+    const v = document.createElement("div"); v.className="value"; v.textContent = t.value;
+    d.append(l, v);
+    if (t.delta !== undefined) {
+      const dl = document.createElement("div");
+      dl.className = "delta " + (t.delta >= 0 ? "up" : "down");
+      dl.textContent = (t.delta >= 0 ? "▲ " : "▼ ");
+      const vs = document.createElement("span"); vs.className="vs"; vs.textContent = " " + t.vs;
+      dl.append(vs);
+      d.append(dl);
+    }
+    wrap.append(d);
+  }
+}
+
+/* ---------- cumulative P&L line chart ---------- */
+const M = { t: 12, r: 14, b: 26, l: 56 };
+function renderPnl(rangeDays) {
+  const svg = document.getElementById("pnl-chart");
+  svg.textContent = "";
+  const W = svg.clientWidth, H = +svg.getAttribute("height");
+  const iw = W - M.l - M.r, ih = H - M.t - M.b;
+  const data = DATA.curve.slice(-rangeDays);
+  const base = data[0].pnl;
+  const series = data.map(d => ({ date: d.date, v: d.pnl - base }));   // rebase to range start
+
+  const min = Math.min(0, ...series.map(d=>d.v)), max = Math.max(0, ...series.map(d=>d.v));
+  const pad = (max-min) * 0.08 || 100;
+  const y = v => M.t + ih - ((v - (min-pad)) / ((max+pad) - (min-pad))) * ih;
+  const x = i => M.l + (i / (series.length-1)) * iw;
+
+  // gridlines + y ticks (clean steps)
+  const step = niceStep((max - min + 2*pad) / 4);
+  for (let v = Math.ceil((min-pad)/step)*step; v <= max+pad; v += step) {
+    svg.append(el("line",{x1:M.l,x2:M.l+iw,y1:y(v),y2:y(v),stroke:css("--grid"),"stroke-width":1}));
+    const t = el("text",{x:M.l-8,y:y(v)+4,"text-anchor":"end"});
+    t.textContent = fmt$(v); svg.append(t);
+  }
+  // zero baseline (slightly stronger)
+  if (min < 0 && max > 0)
+    svg.append(el("line",{x1:M.l,x2:M.l+iw,y1:y(0),y2:y(0),stroke:css("--baseline"),"stroke-width":1}));
+
+  // x ticks
+  const nx = Math.min(6, series.length);
+  for (let k=0;k<nx;k++) {
+    const i = Math.round(k*(series.length-1)/(nx-1));
+    const t = el("text",{x:x(i),y:H-8,"text-anchor": k===0?"start": k===nx-1?"end":"middle"});
+    t.textContent = fmtD(series[i].date); svg.append(t);
+  }
+
+  // area wash + 2px line
+  const pts = series.map((d,i)=>`${x(i)},${y(d.v)}`).join(" ");
+  svg.append(el("polygon",{points:`${M.l},${y(0)} ${pts} ${M.l+iw},${y(0)}`,fill:css("--accent-wash")}));
+  svg.append(el("polyline",{points:pts,fill:"none",stroke:css("--series-1"),
+    "stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round"}));
+  // end marker: 8px dot with 2px surface ring
+  const last = series.length-1;
+  svg.append(el("circle",{cx:x(last),cy:y(series[last].v),r:6,fill:css("--surface-1")}));
+  svg.append(el("circle",{cx:x(last),cy:y(series[last].v),r:4,fill:css("--series-1")}));
+  // selective direct label — endpoint only
+  const endLbl = el("text",{x:x(last)-8,y:y(series[last].v)-10,"text-anchor":"end",
+    style:`fill:${css("--text-primary")};font-weight:650;font-size:12px`});
+  endLbl.textContent = fmt$(series[last].v); svg.append(endLbl);
+
+  document.getElementById("pnl-sub").textContent =
+    `${fmtD(series[0].date)} – ${fmtD(series[last].date)} · rebased to range start`;
+
+  attachCrosshair(svg, document.getElementById("pnl-tip"), series, x, y, iw, ih);
+}
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (const m of [1,2,2.5,5,10]) if (m*p >= raw) return m*p;
+  return 10*p;
+}
+function attachCrosshair(svg, tip, series, x, y, iw, ih) {
+  const line = el("line",{y1:M.t,y2:M.t+ih,stroke:css("--baseline"),"stroke-width":1,visibility:"hidden"});
+  const dotR = el("circle",{r:6,fill:css("--surface-1"),visibility:"hidden"});
+  const dot  = el("circle",{r:4,fill:css("--series-1"),visibility:"hidden"});
+  svg.append(line, dotR, dot);
+  const wrap = svg.parentElement;
+  svg.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect();
+    const px = e.clientX - r.left;
+    const i = Math.max(0, Math.min(series.length-1,
+      Math.round((px - M.l) / iw * (series.length-1))));
+    const cx = x(i), cy = y(series[i].v);
+    line.setAttribute("x1",cx); line.setAttribute("x2",cx); line.setAttribute("visibility","visible");
+    dotR.setAttribute("cx",cx); dotR.setAttribute("cy",cy); dotR.setAttribute("visibility","visible");
+    dot.setAttribute("cx",cx);  dot.setAttribute("cy",cy);  dot.setAttribute("visibility","visible");
+    tip.textContent = "";
+    const td = document.createElement("div"); td.className="tdate";
+    td.textContent = series[i].date.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+    const row = document.createElement("div"); row.className="trow";
+    const key = document.createElement("span"); key.className="key";
+    const tv = document.createElement("span"); tv.className="tval"; tv.textContent = fmt$(series[i].v);
+    const tn = document.createElement("span"); tn.className="tname"; tn.textContent = "cum. P&L";
+    row.append(key, tv, tn);
+    tip.append(td, row);
+    tip.style.display = "block";
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(cx - tw/2, 0), r.width - tw) + "px";
+    tip.style.top  = (cy - tip.offsetHeight - 14) + "px";
+  });
+  svg.addEventListener("pointerleave", () => {
+    tip.style.display = "none";
+    for (const n of [line,dotR,dot]) n.setAttribute("visibility","hidden");
+  });
+}
+
+/* ---------- payoff diagram (diverging: profit blue / loss red) ---------- */
+const STRATEGIES = {
+  ironCondor: { sub:"SPY −545P/+550P short, +580C/−585C · credit $1.85 ×2",
+    fn: s => (1.85 - Math.max(550-s,0) + Math.max(545-s,0) - Math.max(s-580,0) + Math.max(s-585,0)) * 200,
+    lo: 530, hi: 600, strikes:[545,550,580,585] },
+  longCall: { sub:"NVDA +190C · debit $8.40 ×3",
+    fn: s => (Math.max(s-190,0) - 8.40) * 300, lo: 160, hi: 230, strikes:[190] },
+  coveredCall: { sub:"AAPL 100 sh @ 228 + short 240C @ $3.10",
+    fn: s => (s - 228) * 100 + (3.10 - Math.max(s-240,0)) * 100, lo: 205, hi: 260, strikes:[240] },
+  longStraddle: { sub:"QQQ +495C/+495P · debit $9.80",
+    fn: s => (Math.max(s-495,0) + Math.max(495-s,0) - 9.80) * 100, lo: 465, hi: 525, strikes:[495] },
+  bullPutSpread: { sub:"TSLA −300P/+290P · credit $2.40 ×2",
+    fn: s => (2.40 - Math.max(300-s,0) + Math.max(290-s,0)) * 200, lo: 270, hi: 330, strikes:[290,300] },
+};
+function renderPayoff(name) {
+  const S = STRATEGIES[name];
+  const svg = document.getElementById("payoff-chart");
+  svg.textContent = "";
+  document.getElementById("payoff-sub").textContent = S.sub;
+  const W = svg.clientWidth, H = +svg.getAttribute("height");
+  const m = { t: 12, r: 12, b: 26, l: 52 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+
+  const N = 160;
+  const pts = Array.from({length:N+1}, (_,i) => {
+    const s = S.lo + (S.hi-S.lo)*i/N;
+    return { s, v: S.fn(s) };
+  });
+  const min = Math.min(...pts.map(p=>p.v)), max = Math.max(...pts.map(p=>p.v));
+  const pad = (max-min)*0.1 || 50;
+  const x = s => m.l + (s-S.lo)/(S.hi-S.lo)*iw;
+  const y = v => m.t + ih - ((v-(min-pad))/((max+pad)-(min-pad)))*ih;
+
+  // grid + y labels
+  const step = niceStep((max-min+2*pad)/4);
+  for (let v = Math.ceil((min-pad)/step)*step; v <= max+pad; v += step) {
+    svg.append(el("line",{x1:m.l,x2:m.l+iw,y1:y(v),y2:y(v),stroke:css("--grid"),"stroke-width":1}));
+    const t = el("text",{x:m.l-6,y:y(v)+4,"text-anchor":"end"}); t.textContent = fmt$(v); svg.append(t);
+  }
+  // strike ticks (muted, vertical)
+  for (const k of S.strikes) {
+    svg.append(el("line",{x1:x(k),x2:x(k),y1:m.t,y2:m.t+ih,stroke:css("--grid"),"stroke-width":1,"stroke-dasharray":"none"}));
+    const t = el("text",{x:x(k),y:H-8,"text-anchor":"middle"}); t.textContent = k; svg.append(t);
+  }
+  // x-axis end labels
+  const t0 = el("text",{x:m.l,y:H-8,"text-anchor":"start"}); t0.textContent = S.lo; svg.append(t0);
+  const t1 = el("text",{x:m.l+iw,y:H-8,"text-anchor":"end"}); t1.textContent = S.hi; svg.append(t1);
+
+  // zero line
+  svg.append(el("line",{x1:m.l,x2:m.l+iw,y1:y(0),y2:y(0),stroke:css("--baseline"),"stroke-width":1}));
+
+  // washes: profit region / loss region relative to zero
+  const clipUp = el("clipPath",{id:"clip-up"}), clipDn = el("clipPath",{id:"clip-dn"});
+  clipUp.append(el("rect",{x:m.l,y:m.t,width:iw,height:Math.max(0,y(0)-m.t)}));
+  clipDn.append(el("rect",{x:m.l,y:y(0),width:iw,height:Math.max(0,m.t+ih-y(0))}));
+  svg.append(clipUp, clipDn);
+  const poly = pts.map(p=>`${x(p.s)},${y(p.v)}`).join(" ");
+  svg.append(el("polygon",{points:`${m.l},${y(0)} ${poly} ${m.l+iw},${y(0)}`,
+    fill:css("--accent-wash"),"clip-path":"url(#clip-up)"}));
+  svg.append(el("polygon",{points:`${m.l},${y(0)} ${poly} ${m.l+iw},${y(0)}`,
+    fill:css("--neg-wash"),"clip-path":"url(#clip-dn)"}));
+  // payoff line, sign-colored via clip (2px)
+  svg.append(el("polyline",{points:poly,fill:"none",stroke:css("--pos"),"stroke-width":2,
+    "stroke-linejoin":"round","clip-path":"url(#clip-up)"}));
+  svg.append(el("polyline",{points:poly,fill:"none",stroke:css("--neg"),"stroke-width":2,
+    "stroke-linejoin":"round","clip-path":"url(#clip-dn)"}));
+
+  // breakevens — direct-labeled dots
+  for (let i=1;i<pts.length;i++) {
+    if ((pts[i-1].v < 0) !== (pts[i].v < 0)) {
+      const a = pts[i-1], b = pts[i];
+      const bs = a.s + (0-a.v)/(b.v-a.v)*(b.s-a.s);
+      svg.append(el("circle",{cx:x(bs),cy:y(0),r:6,fill:css("--surface-1")}));
+      svg.append(el("circle",{cx:x(bs),cy:y(0),r:4,fill:css("--text-primary")}));
+      const t = el("text",{x:x(bs),y:y(0)-10,"text-anchor":"middle",
+        style:`fill:${css("--text-primary")};font-weight:600`});
+      t.textContent = "BE " + bs.toFixed(1); svg.append(t);
+    }
+  }
+  // hover: crosshair tooltip on underlying price
+  attachPayoffHover(svg, document.getElementById("payoff-tip"), pts, x, y, m, iw, ih);
+}
+function attachPayoffHover(svg, tip, pts, x, y, m, iw, ih) {
+  const line = el("line",{y1:m.t,y2:m.t+ih,stroke:css("--baseline"),"stroke-width":1,visibility:"hidden"});
+  svg.append(line);
+  svg.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect();
+    const px = e.clientX - r.left;
+    const i = Math.max(0, Math.min(pts.length-1, Math.round((px-m.l)/iw*(pts.length-1))));
+    const cx = x(pts[i].s);
+    line.setAttribute("x1",cx); line.setAttribute("x2",cx); line.setAttribute("visibility","visible");
+    tip.textContent = "";
+    const td = document.createElement("div"); td.className="tdate";
+    td.textContent = "Underlying @ " + pts[i].s.toFixed(1);
+    const row = document.createElement("div"); row.className="trow";
+    const tv = document.createElement("span"); tv.className="tval";
+    tv.textContent = fmt$(Math.round(pts[i].v));
+    tv.style.color = pts[i].v >= 0 ? css("--good-text") : css("--bad-text");
+    const tn = document.createElement("span"); tn.className="tname"; tn.textContent = "at expiry";
+    row.append(tv, tn); tip.append(td, row);
+    tip.style.display = "block";
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(cx - tw/2, 0), r.width - tw) + "px";
+    tip.style.top = "6px";
+  });
+  svg.addEventListener("pointerleave", () => {
+    tip.style.display = "none"; line.setAttribute("visibility","hidden");
+  });
+}
+
+/* ---------- delta exposure — diverging horizontal bars ---------- */
+function renderDelta() {
+  const svg = document.getElementById("delta-chart");
+  svg.textContent = "";
+  const rows = [...DATA.positions].sort((a,b)=>b.delta-a.delta);
+  const W = svg.clientWidth, H = +svg.getAttribute("height");
+  const m = { t: 8, r: 46, b: 8, l: 52 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const maxAbs = Math.max(...rows.map(r=>Math.abs(r.delta)));
+  const x = v => m.l + iw/2 + (v/maxAbs)*(iw/2);
+  const bh = Math.min(24, ih/rows.length - 6);
+
+  svg.append(el("line",{x1:x(0),x2:x(0),y1:m.t,y2:m.t+ih,stroke:css("--baseline"),"stroke-width":1}));
+  rows.forEach((r,i) => {
+    const cy = m.t + (i+0.5)*(ih/rows.length);
+    const w = Math.abs(x(r.delta)-x(0));
+    const bx = r.delta >= 0 ? x(0) : x(r.delta);
+    const fill = r.delta >= 0 ? css("--pos") : css("--neg");
+    // 4px rounded data-end, square at baseline: use path
+    const rr = Math.min(4, w);
+    const yTop = cy-bh/2;
+    const path = r.delta >= 0
+      ? `M${bx},${yTop} h${w-rr} a${rr},${rr} 0 0 1 ${rr},${rr} v${bh-2*rr} a${rr},${rr} 0 0 1 -${rr},${rr} h-${w-rr} z`
+      : `M${bx+w},${yTop} h-${w-rr} a${rr},${rr} 0 0 0 -${rr},${rr} v${bh-2*rr} a${rr},${rr} 0 0 0 ${rr},${rr} h${w-rr} z`;
+    const bar = el("path",{d:path,fill});
+    svg.append(bar);
+    // symbol label (text token, left)
+    const t = el("text",{x:m.l-8,y:cy+4,"text-anchor":"end",
+      style:`fill:${css("--text-secondary")};font-weight:600`});
+    t.textContent = r.sym; svg.append(t);
+    // value at the bar tip
+    const vt = el("text",{x: r.delta>=0 ? x(r.delta)+6 : x(r.delta)-6, y:cy+4,
+      "text-anchor": r.delta>=0 ? "start":"end",
+      style:`fill:${css("--text-primary")};font-weight:600`});
+    vt.textContent = (r.delta>0?"+":"") + r.delta; svg.append(vt);
+    // hover lift
+    bar.style.cursor = "default";
+    bar.addEventListener("pointerenter",()=>bar.setAttribute("opacity","0.8"));
+    bar.addEventListener("pointerleave",()=>bar.removeAttribute("opacity"));
+  });
+}
+
+/* ---------- positions table ---------- */
+function renderTable() {
+  const tb = document.querySelector("#positions tbody");
+  for (const p of DATA.positions) {
+    const tr = document.createElement("tr");
+    const cells = [
+      { t: p.sym, c: "sym" }, { t: p.strat, c: "strat" },
+      { t: p.exp.slice(5) }, { t: p.dte }, { t: (p.qty>0?"+":"")+p.qty },
+      { t: fmt$2(p.entry) }, { t: fmt$2(p.mark) },
+      { t: fmt$(p.pnl), c: "pnl " + (p.pnl>=0?"up":"down") },
+      { t: (p.delta>0?"+":"")+p.delta }, { t: (p.theta>0?"+":"")+p.theta.toFixed(1) },
+      { t: Math.round(p.iv*100)+"%" },
+    ];
+    for (const c of cells) {
+      const td = document.createElement("td");
+      td.textContent = c.t;
+      if (c.c) td.className = c.c;
+      tr.append(td);
+    }
+    tb.append(tr);
+  }
+}
+
+/* ---------- boot & wiring ---------- */
+let currentRange = 90;
+renderTiles();
+renderTable();
+renderDelta();
+renderPnl(currentRange);
+renderPayoff("ironCondor");
+
+document.querySelectorAll(".range-btn").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".range-btn").forEach(x=>x.setAttribute("aria-pressed","false"));
+  b.setAttribute("aria-pressed","true");
+  currentRange = +b.dataset.days;
+  renderPnl(currentRange);
+}));
+document.getElementById("strategy").addEventListener("change", e => renderPayoff(e.target.value));
+
+// re-render charts on resize / theme change
+let rt; window.addEventListener("resize", () => {
+  clearTimeout(rt);
+  rt = setTimeout(() => { renderPnl(currentRange); renderPayoff(document.getElementById("strategy").value); renderDelta(); }, 150);
+});
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  renderPnl(currentRange); renderPayoff(document.getElementById("strategy").value); renderDelta();
+});
+</script>
+</body>
+</html>
