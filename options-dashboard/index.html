@@ -412,12 +412,27 @@
   <!-- Trade tracker -->
   <section class="card span-12">
     <h2>Trade tracker</h2>
-    <div class="h2sub">Entry checklist: Δ .15–.4 · IV rank &gt;30 · gamma lower is better · theta working in your favour · DTE 30–45 &nbsp;·&nbsp; exit rule: take profit at 50–70% of max, let it expire once premium's nearly gone</div>
+    <div class="h2sub">Entry checklist: Δ .15–.4 · IV rank &gt;30 · gamma lower is better · theta working in your favour · DTE 30–45 &nbsp;·&nbsp; exit rule: take profit at 50–70% of max, let it expire once premium's nearly gone &nbsp;·&nbsp; Profit = premium received − closing cost (full premium if expired worthless) &nbsp;·&nbsp; COCR = premium received ÷ capital required</div>
     <div class="tbl-scroll">
       <table id="tracker">
         <thead><tr>
           <th>Symbol</th><th>Strategy</th><th>Capital</th><th>Opened</th><th>DTE@entry</th><th>Days held</th>
-          <th>Δ</th><th>IV rank</th><th>Γ</th><th>Θ</th><th>Max profit</th><th>Current P&amp;L</th><th>% captured</th><th>Action</th>
+          <th>Δ</th><th>IV rank</th><th>Γ</th><th>Θ</th><th>Max profit</th><th>Profit</th><th>% captured</th><th>COCR</th><th>Action</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Share lots -->
+  <section class="card span-12">
+    <h2>Share lots — assigned stock</h2>
+    <div class="h2sub">Avg cost/share = assignment strike − premium received/share &nbsp;·&nbsp; Total return (if called away) = capital gain (CC strike − avg cost) + CC premium/share</div>
+    <div class="tbl-scroll">
+      <table id="lots">
+        <thead><tr>
+          <th>Symbol</th><th>Shares</th><th>Assigned strike</th><th>Premium/sh</th><th>Avg cost/sh</th>
+          <th>Current price</th><th>Unrealized</th><th>Active CC</th><th>Total return/sh</th><th>Total return</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -508,8 +523,17 @@ function mockData() {
       delta:0.30, ivRank:34, gamma:0.016, theta:4.0, entryCredit:2.40, value:1.08, status:"closed", outcome:"profit" },
   ];
 
+  // stock lots acquired via CSP assignment. MSFT/NVDA already have an
+  // active covered call written against them (matching the CC trades
+  // above); TSLA was assigned but no CC has been written yet.
+  const shareLots = [
+    { sym:"TSLA", shares:100, assignedStrike:290, assignPremium:4.50, currentPrice:318, cc:null },
+    { sym:"MSFT", shares:100, assignedStrike:450, assignPremium:3.10, currentPrice:452, cc:{ strike:460, premium:4.20 } },
+    { sym:"NVDA", shares:100, assignedStrike:175, assignPremium:2.60, currentPrice:172, cc:{ strike:180, premium:3.40 } },
+  ];
+
   return {
-    curve, positions, screener, trades, vix: 27.3,
+    curve, positions, screener, trades, shareLots, vix: 27.3,
     account: { netLiq: 84760, dayPnl: +642, openPnl: positions.reduce((s,p)=>s+p.pnl,0),
                buyingPower: 31240,
                delta: positions.reduce((s,p)=>s+p.delta,0),
@@ -973,15 +997,17 @@ function renderTracker() {
     tr.append(badgeCell(t.gamma.toFixed(3), gammaChecklistStatus(t.gamma)));
     tr.append(badgeCell("+" + t.theta.toFixed(1), thetaChecklistStatus(t.theta)));
 
-    const maxProfit = t.entryCredit * 100;
-    const pnl = (t.entryCredit - t.value) * 100;
-    const captured = pnl / maxProfit;
+    const maxProfit = t.entryCredit * 100;          // premium received, full contract
+    const profit = (t.entryCredit - t.value) * 100; // premium received − closing cost (0 if expired worthless)
+    const captured = profit / maxProfit;
+    const cocr = maxProfit / t.capital * 100;        // premium received ÷ capital required
 
     const maxTd = document.createElement("td"); maxTd.textContent = fmt$(Math.round(maxProfit));
-    const pnlTd = document.createElement("td"); pnlTd.textContent = fmt$(Math.round(pnl));
-    pnlTd.className = "pnl " + (pnl >= 0 ? "up" : "down");
+    const profitTd = document.createElement("td"); profitTd.textContent = fmt$(Math.round(profit));
+    profitTd.className = "pnl " + (profit >= 0 ? "up" : "down");
     const capPctTd = document.createElement("td"); capPctTd.textContent = Math.round(captured * 100) + "%";
-    tr.append(maxTd, pnlTd, capPctTd);
+    const cocrTd = document.createElement("td"); cocrTd.textContent = cocr.toFixed(1) + "%";
+    tr.append(maxTd, profitTd, capPctTd, cocrTd);
 
     let action;
     if (t.status === "closed") {
@@ -999,6 +1025,45 @@ function renderTracker() {
       action = ["neutral","–","Hold"];
     }
     tr.append(actionBadgeCell(action));
+
+    tb.append(tr);
+  }
+}
+
+/* ---------- share lots: avg cost basis + total return on assignment ---------- */
+function renderShareLots() {
+  const tb = document.querySelector("#lots tbody");
+  for (const l of DATA.shareLots) {
+    const avgCost = l.assignedStrike - l.assignPremium;
+    const unrealized = (l.currentPrice - avgCost) * l.shares;
+
+    const tr = document.createElement("tr");
+    const symTd = document.createElement("td"); symTd.className = "sym"; symTd.textContent = l.sym;
+    const sharesTd = document.createElement("td"); sharesTd.textContent = l.shares;
+    const strikeTd = document.createElement("td"); strikeTd.textContent = fmt$2(l.assignedStrike);
+    const premTd = document.createElement("td"); premTd.textContent = fmt$2(l.assignPremium);
+    const avgTd = document.createElement("td"); avgTd.textContent = fmt$2(avgCost);
+    avgTd.style.fontWeight = "650";
+    const curTd = document.createElement("td"); curTd.textContent = fmt$2(l.currentPrice);
+    const unrTd = document.createElement("td"); unrTd.textContent = fmt$(Math.round(unrealized));
+    unrTd.className = "pnl " + (unrealized >= 0 ? "up" : "down");
+    tr.append(symTd, sharesTd, strikeTd, premTd, avgTd, curTd, unrTd);
+
+    if (l.cc) {
+      const ccTd = document.createElement("td"); ccTd.className = "strat";
+      ccTd.textContent = fmt$2(l.cc.strike) + "C @ " + fmt$2(l.cc.premium);
+      const capGain = l.cc.strike - avgCost;
+      const totalReturnSh = capGain + l.cc.premium;
+      const trShTd = document.createElement("td"); trShTd.textContent = fmt$2(totalReturnSh);
+      const trTotTd = document.createElement("td"); trTotTd.textContent = fmt$(Math.round(totalReturnSh * l.shares));
+      trTotTd.className = "pnl " + (totalReturnSh >= 0 ? "up" : "down");
+      tr.append(ccTd, trShTd, trTotTd);
+    } else {
+      const noneTd = document.createElement("td"); noneTd.className = "strat"; noneTd.textContent = "— none written";
+      const dashTd1 = document.createElement("td"); dashTd1.textContent = "—";
+      const dashTd2 = document.createElement("td"); dashTd2.textContent = "—";
+      tr.append(noneTd, dashTd1, dashTd2);
+    }
 
     tb.append(tr);
   }
@@ -1133,6 +1198,7 @@ renderClock();
 renderCapital();
 renderTable();
 renderTracker();
+renderShareLots();
 renderScreener();
 renderDelta();
 renderPnl(currentRange);
