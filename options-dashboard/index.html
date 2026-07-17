@@ -132,6 +132,25 @@
     color: var(--text-primary); font-weight: 650;
     border-color: var(--baseline);
   }
+  .demo-badge.live { color: var(--good-text); border-color: var(--good-text); }
+
+  /* live data connect bar */
+  .live-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin: -8px 0 4px;
+  }
+  .live-label { font-size: 12.5px; color: var(--text-muted); }
+  #td-apikey {
+    font: inherit; font-size: 12.5px; color: var(--text-primary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 7px; padding: 4px 10px; width: 220px;
+  }
+  .live-status { font-size: 12px; color: var(--text-secondary); }
+  .live-status.ok { color: var(--good-text); }
+  .live-status.err { color: var(--bad-text); }
+  .live-link { font-size: 12px; color: var(--series-1); text-decoration: none; margin-left: auto; }
+  .live-link:hover { text-decoration: underline; }
+  .live-note { color: var(--text-muted); font-size: 11px; margin: 0 0 14px; max-width: 900px; }
 
   .grid {
     display: grid; gap: 14px;
@@ -283,7 +302,7 @@
 
 <header class="top">
   <h1>Options dashboard</h1>
-  <span class="demo-badge">TEMPLATE · MOCK DATA</span>
+  <span class="demo-badge" id="data-badge">TEMPLATE · MOCK DATA</span>
   <span class="sub" id="asof"></span>
 </header>
 
@@ -294,6 +313,17 @@
   <button class="range-btn" data-days="90" aria-pressed="true">3M</button>
   <button class="range-btn" data-days="180">6M</button>
 </div>
+
+<div class="live-bar">
+  <span class="live-label">Live data (Twelve Data)</span>
+  <input id="td-apikey" type="password" placeholder="Paste your free API key" autocomplete="off" spellcheck="false">
+  <button class="range-btn" id="td-connect">Connect</button>
+  <button class="range-btn" id="td-refresh" hidden>Refresh</button>
+  <button class="range-btn" id="td-disconnect" hidden>Disconnect</button>
+  <span class="live-status" id="td-status">Not connected — showing mock data</span>
+  <a class="live-link" href="https://twelvedata.com/pricing" target="_blank" rel="noopener noreferrer">Get a free key ↗</a>
+</div>
+<p class="live-note">Your key is saved only in this browser (localStorage) — never sent anywhere but twelvedata.com, and never committed to this repo. Covers VIX, stock prices, and volume; IV, open interest, spreads, and greeks stay mock/manual (not available from a basic quotes API).</p>
 
 <div class="grid">
 
@@ -602,6 +632,82 @@ const css = v => getComputedStyle(document.body).getPropertyValue(v).trim();
 document.getElementById("asof").textContent =
   "As of " + new Date().toLocaleDateString("en-US",{weekday:"short",month:"long",day:"numeric",year:"numeric"});
 
+/* ---------- live market data (Twelve Data) ----------
+   Key lives only in this browser's localStorage — never in this file,
+   never committed. Covers VIX + equity price/volume only; options-chain
+   fields (IV, OI, spread, greeks) aren't available from a quotes API and
+   stay mock/manual. */
+const TD_KEY_STORAGE = "wheelDashTdApiKey";
+const getTdKey = () => localStorage.getItem(TD_KEY_STORAGE) || "";
+let liveData = { connected:false, quotes:{}, vix:null, lastFetch:null, error:null };
+
+function updateDataBadge() {
+  const badge = document.getElementById("data-badge");
+  if (liveData.connected) {
+    badge.textContent = liveData.vix !== null ? "LIVE DATA" : "LIVE DATA · PARTIAL";
+    badge.classList.add("live");
+  } else {
+    badge.textContent = "TEMPLATE · MOCK DATA";
+    badge.classList.remove("live");
+  }
+}
+
+async function fetchLiveData() {
+  const key = getTdKey();
+  const statusEl = document.getElementById("td-status");
+  if (!key) {
+    liveData = { connected:false, quotes:{}, vix:null, lastFetch:null, error:null };
+    statusEl.textContent = "Not connected — showing mock data";
+    statusEl.className = "live-status";
+    updateDataBadge();
+    return;
+  }
+
+  const symbols = [...new Set(DATA.screener.map(s => s.sym))];
+  const allSymbols = [...symbols, "VIX"];
+  statusEl.textContent = "Connecting…";
+  statusEl.className = "live-status";
+
+  try {
+    const url = `https://api.twelvedata.com/quote?symbol=${allSymbols.join(",")}&apikey=${encodeURIComponent(key)}`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (json.status === "error" || (json.code && json.code >= 400)) {
+      throw new Error(json.message || `API error (HTTP ${res.status})`);
+    }
+
+    const quotes = {};
+    let vix = null;
+    for (const sym of allSymbols) {
+      const q = json[sym];
+      if (!q || q.status === "error") continue; // symbol Twelve Data couldn't resolve — skip, keep mock for it
+      const price = parseFloat(q.close);
+      const volume = q.average_volume ? parseFloat(q.average_volume) : parseFloat(q.volume);
+      if (!Number.isFinite(price)) continue;
+      if (sym === "VIX") vix = price;
+      else quotes[sym] = { price, volume: Number.isFinite(volume) ? volume : null };
+    }
+
+    liveData = { connected:true, quotes, vix, lastFetch:new Date(), error:null };
+
+    const gotCount = Object.keys(quotes).length;
+    statusEl.textContent = `Connected — live as of ${liveData.lastFetch.toLocaleTimeString()}` +
+      (vix === null ? " · VIX unavailable, using mock" : "") +
+      (gotCount < symbols.length ? ` · ${gotCount}/${symbols.length} symbols resolved` : "");
+    statusEl.className = "live-status ok";
+  } catch (err) {
+    liveData = { connected:false, quotes:{}, vix:null, lastFetch:null, error:err.message };
+    statusEl.textContent = "Error: " + err.message + " — showing mock data";
+    statusEl.className = "live-status err";
+  }
+
+  updateDataBadge();
+  renderVix();
+  renderScreener();
+  renderShareLots();
+}
+
 /* ---------- KPI tiles ---------- */
 function renderTiles() {
   const a = DATA.account;
@@ -648,11 +754,12 @@ function vixZone(v) {
   return { name: "Extreme", note: "above 40 · outsized risk", swatch: "--bad-text" };
 }
 function renderVix() {
-  const v = DATA.vix;
+  const v = liveData.vix !== null ? liveData.vix : DATA.vix;
   const zone = vixZone(v);
   document.getElementById("vix-value").textContent = v.toFixed(1);
   document.getElementById("vix-dot").style.background = css(zone.swatch);
-  document.getElementById("vix-zone-text").textContent = `${zone.name} — ${zone.note}`;
+  document.getElementById("vix-zone-text").textContent = `${zone.name} — ${zone.note}` +
+    (liveData.connected && liveData.vix === null ? " (mock — VIX unavailable)" : "");
 
   const svg = document.getElementById("vix-meter");
   svg.textContent = "";
@@ -980,7 +1087,12 @@ function badgeCell(value, status) {
 }
 function renderScreener() {
   const tb = document.querySelector("#screener tbody");
+  tb.textContent = "";
   for (const s of DATA.screener) {
+    const live = liveData.quotes[s.sym];
+    const price = live ? live.price : s.price;
+    const avgVol = live && live.volume !== null ? live.volume : s.avgVol;
+
     const tr = document.createElement("tr");
 
     const symTd = document.createElement("td"); symTd.className = "sym"; symTd.textContent = s.sym;
@@ -989,13 +1101,14 @@ function renderScreener() {
     qTd.append(mark);
     tr.append(symTd, qTd);
 
-    tr.append(badgeCell(fmtVol(s.avgVol), volStatus(s.avgVol)));
+    tr.append(badgeCell(fmtVol(avgVol), volStatus(avgVol)));
     tr.append(badgeCell(s.oi.toLocaleString("en-US"), oiStatus(s.oi)));
     tr.append(badgeCell(fmt$2(s.spread), spreadStatus(s.spread)));
     tr.append(badgeCell(Math.round(s.iv*100)+"%", ivStatus(s.iv)));
 
-    const priceTd = document.createElement("td"); priceTd.textContent = fmt$2(s.price);
-    const contractTd = document.createElement("td"); contractTd.textContent = fmt$(s.price*100);
+    const priceTd = document.createElement("td");
+    priceTd.textContent = fmt$2(price) + (!live && liveData.connected ? " (mock)" : "");
+    const contractTd = document.createElement("td"); contractTd.textContent = fmt$(price*100);
     tr.append(priceTd, contractTd);
 
     tr.append(badgeCell(s.earningsDays===null ? "—" : `${s.earningsDays}d`, earningsStatus(s.earningsDays)));
@@ -1134,7 +1247,10 @@ function exDivRiskStatus(lot) {
 
 function renderShareLots() {
   const tb = document.querySelector("#lots tbody");
-  for (const l of DATA.shareLots) {
+  tb.textContent = "";
+  for (const l0 of DATA.shareLots) {
+    const live = liveData.quotes[l0.sym];
+    const l = live ? { ...l0, currentPrice: live.price } : l0;
     const avgCost = l.assignedStrike - l.assignPremium;
     const unrealized = (l.currentPrice - avgCost) * l.shares;
 
@@ -1145,7 +1261,8 @@ function renderShareLots() {
     const premTd = document.createElement("td"); premTd.textContent = fmt$2(l.assignPremium);
     const avgTd = document.createElement("td"); avgTd.textContent = fmt$2(avgCost);
     avgTd.style.fontWeight = "650";
-    const curTd = document.createElement("td"); curTd.textContent = fmt$2(l.currentPrice);
+    const curTd = document.createElement("td");
+    curTd.textContent = fmt$2(l.currentPrice) + (!live && liveData.connected ? " (mock)" : "");
     const unrTd = document.createElement("td"); unrTd.textContent = fmt$(Math.round(unrealized));
     unrTd.className = "pnl " + (unrealized >= 0 ? "up" : "down");
     tr.append(symTd, sharesTd, strikeTd, premTd, avgTd, curTd, unrTd);
@@ -1361,6 +1478,31 @@ document.getElementById("cap-input").addEventListener("input", e => {
   if (Number.isFinite(v) && v >= 0) localStorage.setItem(CAPITAL_KEY, v);
   renderCapital();
 });
+
+// live data connect/disconnect/refresh — key never leaves this browser
+const savedTdKey = getTdKey();
+if (savedTdKey) {
+  document.getElementById("td-apikey").value = savedTdKey;
+  document.getElementById("td-disconnect").hidden = false;
+  document.getElementById("td-refresh").hidden = false;
+}
+document.getElementById("td-connect").addEventListener("click", () => {
+  const val = document.getElementById("td-apikey").value.trim();
+  if (!val) return;
+  localStorage.setItem(TD_KEY_STORAGE, val);
+  document.getElementById("td-disconnect").hidden = false;
+  document.getElementById("td-refresh").hidden = false;
+  fetchLiveData();
+});
+document.getElementById("td-refresh").addEventListener("click", fetchLiveData);
+document.getElementById("td-disconnect").addEventListener("click", () => {
+  localStorage.removeItem(TD_KEY_STORAGE);
+  document.getElementById("td-apikey").value = "";
+  document.getElementById("td-disconnect").hidden = true;
+  document.getElementById("td-refresh").hidden = true;
+  fetchLiveData();
+});
+if (savedTdKey) fetchLiveData();
 
 // re-render charts on resize / theme change
 let rt; window.addEventListener("resize", () => {
