@@ -253,6 +253,11 @@
   .expiry-note { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--grid); font-size: 12.5px; color: var(--text-secondary); }
   .expiry-note b { color: var(--text-primary); }
 
+  /* trade scorecard */
+  .scorecard-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px; }
+  .scorecard-tile .label { font-size: 12.5px; color: var(--text-secondary); }
+  .scorecard-tile .value { font-size: 22px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
   /* payoff strategy select */
   select {
     font: inherit; font-size: 12.5px; color: var(--text-primary);
@@ -409,6 +414,13 @@
     </div>
   </section>
 
+  <!-- Trade scorecard -->
+  <section class="card span-12">
+    <h2>Trade scorecard</h2>
+    <div class="h2sub">Win rate, COCR, and cycle speed across closed trades &nbsp;·&nbsp; premium collected is trailing 12 months across all trades, open and closed</div>
+    <div class="scorecard-tiles" id="scorecard-tiles"></div>
+  </section>
+
   <!-- Trade tracker -->
   <section class="card span-12">
     <h2>Trade tracker</h2>
@@ -442,12 +454,13 @@
   <!-- Share lots -->
   <section class="card span-12">
     <h2>Share lots — assigned stock</h2>
-    <div class="h2sub">Avg cost/share = assignment strike − premium received/share &nbsp;·&nbsp; Total return (if called away) = capital gain (CC strike − avg cost) + CC premium/share</div>
+    <div class="h2sub">Avg cost/share = assignment strike − premium received/share &nbsp;·&nbsp; Total return (if called away) = capital gain (CC strike − avg cost) + CC premium/share &nbsp;·&nbsp; Assignment risk is a simplified heuristic (ITM + ex-div within 5 days + dividend ≥$0.20), not a real pricing model — always confirm against actual extrinsic value</div>
     <div class="tbl-scroll">
       <table id="lots">
         <thead><tr>
           <th>Symbol</th><th>Shares</th><th>Assigned strike</th><th>Premium/sh</th><th>Avg cost/sh</th>
           <th>Current price</th><th>Unrealized</th><th>Active CC</th><th>Total return/sh</th><th>Total return</th>
+          <th>Next ex-div</th><th>Assignment risk</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -538,13 +551,21 @@ function mockData() {
       delta:0.30, ivRank:34, gamma:0.016, theta:4.0, entryCredit:2.40, value:1.08, status:"closed", outcome:"profit" },
   ];
 
-  // stock lots acquired via CSP assignment. MSFT/NVDA already have an
-  // active covered call written against them (matching the CC trades
-  // above); TSLA was assigned but no CC has been written yet.
+  // stock lots acquired via CSP assignment. MSFT/NVDA/JPM already have an
+  // active covered call written against them; TSLA was assigned but no CC
+  // has been written yet (and TSLA pays no dividend, so exDiv is null).
+  // exDiv drives the early-assignment risk flag: real risk only shows up
+  // when the CC is in the money AND ex-div is close AND the dividend is
+  // big enough to matter — JPM below is deliberately set up that way.
   const shareLots = [
-    { sym:"TSLA", shares:100, assignedStrike:290, assignPremium:4.50, currentPrice:318, cc:null },
-    { sym:"MSFT", shares:100, assignedStrike:450, assignPremium:3.10, currentPrice:452, cc:{ strike:460, premium:4.20 } },
-    { sym:"NVDA", shares:100, assignedStrike:175, assignPremium:2.60, currentPrice:172, cc:{ strike:180, premium:3.40 } },
+    { sym:"TSLA", shares:100, assignedStrike:290, assignPremium:4.50, currentPrice:318,
+      cc:null, exDiv:null },
+    { sym:"MSFT", shares:100, assignedStrike:450, assignPremium:3.10, currentPrice:452,
+      cc:{ strike:460, premium:4.20 }, exDiv:{ days:3, dividendPerShare:0.83 } },
+    { sym:"NVDA", shares:100, assignedStrike:175, assignPremium:2.60, currentPrice:172,
+      cc:{ strike:180, premium:3.40 }, exDiv:{ days:12, dividendPerShare:0.04 } },
+    { sym:"JPM",  shares:100, assignedStrike:195, assignPremium:3.20, currentPrice:214,
+      cc:{ strike:210, premium:2.80 }, exDiv:{ days:3, dividendPerShare:1.15 } },
   ];
 
   // roll chains: a position rolled one or more times, tracked as a single
@@ -984,6 +1005,48 @@ function renderScreener() {
   }
 }
 
+/* ---------- trade scorecard ---------- */
+function renderScorecard() {
+  const trades = DATA.trades;
+  const closed = trades.filter(t => t.status === "closed");
+
+  const closedStats = closed.map(t => {
+    const profit = (t.entryCredit - t.value) * 100;
+    const cocr = (t.entryCredit * 100) / t.capital * 100;
+    const cocrAnn = cocr / Math.max(t.daysHeld, 1) * 365;
+    return { profit, cocr, cocrAnn, daysHeld: t.daysHeld };
+  });
+  const avg = arr => arr.length ? arr.reduce((s,v) => s+v, 0) / arr.length : 0;
+
+  const winRate = closed.length ? closedStats.filter(s => s.profit >= 0).length / closed.length * 100 : 0;
+  const avgCocr = avg(closedStats.map(s => s.cocr));
+  const avgCocrAnn = avg(closedStats.map(s => s.cocrAnn));
+  const avgDaysHeld = avg(closedStats.map(s => s.daysHeld));
+  const totalRealized = closedStats.reduce((s, v) => s + v.profit, 0);
+
+  const oneYearAgo = new Date(); oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+  const trailing12mo = trades.filter(t => t.opened >= oneYearAgo)
+    .reduce((s, t) => s + t.entryCredit * 100, 0);
+
+  const tiles = [
+    { label: `Win rate (${closed.length} closed)`, value: closed.length ? Math.round(winRate) + "%" : "—" },
+    { label: "Avg COCR (closed)", value: closed.length ? avgCocr.toFixed(1) + "%" : "—" },
+    { label: "Avg COCR ann. (closed)", value: closed.length ? Math.round(avgCocrAnn) + "%" : "—" },
+    { label: "Avg days held (closed)", value: closed.length ? avgDaysHeld.toFixed(0) + "d" : "—" },
+    { label: "Realized profit (closed)", value: fmt$(Math.round(totalRealized)) },
+    { label: "Premium collected (12mo)", value: fmt$(Math.round(trailing12mo)) },
+  ];
+  const wrap = document.getElementById("scorecard-tiles");
+  wrap.textContent = "";
+  for (const t of tiles) {
+    const d = document.createElement("div"); d.className = "scorecard-tile";
+    const l = document.createElement("div"); l.className = "label"; l.textContent = t.label;
+    const v = document.createElement("div"); v.className = "value"; v.textContent = t.value;
+    d.append(l, v);
+    wrap.append(d);
+  }
+}
+
 /* ---------- trade tracker: checklist + 50-70% exit rule ---------- */
 function deltaChecklistStatus(d) { return (d >= 0.15 && d <= 0.40) ? ["good","✓","OK"] : ["warn","~","Outside .15–.4"]; }
 function ivRankStatus(r)         { return r > 30 ? ["good","✓","OK"] : ["warn","~","Below 30"]; }
@@ -1059,6 +1122,16 @@ function renderTracker() {
 }
 
 /* ---------- share lots: avg cost basis + total return on assignment ---------- */
+function exDivRiskStatus(lot) {
+  if (!lot.cc) return ["neutral","–","No CC"];
+  if (!lot.exDiv) return ["neutral","–","No dividend"];
+  if (lot.exDiv.days > 5) return ["good","✓",`Not yet (${lot.exDiv.days}d)`];
+  const itm = lot.currentPrice >= lot.cc.strike;
+  if (!itm) return ["good","✓","Low — OTM"];
+  if (lot.exDiv.dividendPerShare >= 0.20) return ["bad","✗","High — ITM near ex-div"];
+  return ["warn","~","ITM but dividend small"];
+}
+
 function renderShareLots() {
   const tb = document.querySelector("#lots tbody");
   for (const l of DATA.shareLots) {
@@ -1092,6 +1165,11 @@ function renderShareLots() {
       const dashTd2 = document.createElement("td"); dashTd2.textContent = "—";
       tr.append(noneTd, dashTd1, dashTd2);
     }
+
+    const exDivTd = document.createElement("td");
+    exDivTd.textContent = l.exDiv ? `${l.exDiv.days}d ($${l.exDiv.dividendPerShare.toFixed(2)}/sh)` : "—";
+    tr.append(exDivTd);
+    tr.append(actionBadgeCell(exDivRiskStatus(l)));
 
     tb.append(tr);
   }
@@ -1260,6 +1338,7 @@ renderVix();
 renderClock();
 renderCapital();
 renderTable();
+renderScorecard();
 renderTracker();
 renderShareLots();
 renderRollChains();
