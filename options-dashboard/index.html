@@ -323,7 +323,7 @@
   <span class="live-status" id="td-status">Not connected — showing mock data</span>
   <a class="live-link" href="https://twelvedata.com/pricing" target="_blank" rel="noopener noreferrer">Get a free key ↗</a>
 </div>
-<p class="live-note">Your key is saved only in this browser (localStorage) — never sent anywhere but twelvedata.com, and never committed to this repo. Covers VIX, stock prices, and volume; IV, open interest, spreads, and greeks stay mock/manual (not available from a basic quotes API).</p>
+<p class="live-note">Your key is saved only in this browser (localStorage) — never sent anywhere but twelvedata.com, and never committed to this repo. Covers VIX, stock prices, and volume; IV, open interest, spreads, and greeks stay mock/manual (not available from a basic quotes API). On the free tier a full refresh is paced in small batches to stay under the rate limit, so it can take a couple of minutes — the status line tracks progress.</p>
 
 <div class="grid">
 
@@ -665,41 +665,59 @@ async function fetchLiveData() {
 
   const symbols = [...new Set(DATA.screener.map(s => s.sym))];
   const allSymbols = [...symbols, "VIX"];
-  statusEl.textContent = "Connecting…";
-  statusEl.className = "live-status";
 
-  try {
-    const url = `https://api.twelvedata.com/quote?symbol=${allSymbols.join(",")}&apikey=${encodeURIComponent(key)}`;
-    const res = await fetch(url);
-    const json = await res.json();
+  // Free tier caps at 8 credits/minute. Confirmed live: a 7-symbol batch
+  // was rejected citing "14 credits used" — quote calls appear to cost
+  // ~2 credits/symbol here, not 1. Chunk conservatively (3 symbols = 6
+  // credits, comfortable margin) and pace chunks a full minute+ apart.
+  const CHUNK = 3;
+  const chunks = [];
+  for (let i = 0; i < allSymbols.length; i += CHUNK) chunks.push(allSymbols.slice(i, i + CHUNK));
 
-    if (json.status === "error" || (json.code && json.code >= 400)) {
-      throw new Error(json.message || `API error (HTTP ${res.status})`);
+  const quotes = {};
+  let vix = null;
+  let lastError = null;
+
+  for (let i = 0; i < chunks.length; i++) {
+    statusEl.textContent = chunks.length > 1 ? `Fetching batch ${i+1}/${chunks.length}…` : "Connecting…";
+    statusEl.className = "live-status";
+    try {
+      const url = `https://api.twelvedata.com/quote?symbol=${chunks[i].join(",")}&apikey=${encodeURIComponent(key)}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.status === "error" || (json.code && json.code >= 400)) {
+        throw new Error(json.message || `API error (HTTP ${res.status})`);
+      }
+      for (const sym of chunks[i]) {
+        const q = json[sym];
+        if (!q || q.status === "error") continue; // symbol Twelve Data couldn't resolve — skip, keep mock for it
+        const price = parseFloat(q.close);
+        const volume = q.average_volume ? parseFloat(q.average_volume) : parseFloat(q.volume);
+        if (!Number.isFinite(price)) continue;
+        if (sym === "VIX") vix = price;
+        else quotes[sym] = { price, volume: Number.isFinite(volume) ? volume : null };
+      }
+    } catch (err) {
+      lastError = err.message; // a failed chunk doesn't discard symbols already fetched
     }
-
-    const quotes = {};
-    let vix = null;
-    for (const sym of allSymbols) {
-      const q = json[sym];
-      if (!q || q.status === "error") continue; // symbol Twelve Data couldn't resolve — skip, keep mock for it
-      const price = parseFloat(q.close);
-      const volume = q.average_volume ? parseFloat(q.average_volume) : parseFloat(q.volume);
-      if (!Number.isFinite(price)) continue;
-      if (sym === "VIX") vix = price;
-      else quotes[sym] = { price, volume: Number.isFinite(volume) ? volume : null };
+    if (i < chunks.length - 1) {
+      statusEl.textContent = `Batch ${i+1}/${chunks.length} done — waiting ~65s to stay under the free-tier rate limit…`;
+      await new Promise(r => setTimeout(r, 65000));
     }
+  }
 
-    liveData = { connected:true, quotes, vix, lastFetch:new Date(), error:null };
-
-    const gotCount = Object.keys(quotes).length;
+  const gotCount = Object.keys(quotes).length;
+  if (gotCount === 0 && lastError) {
+    liveData = { connected:false, quotes:{}, vix:null, lastFetch:null, error:lastError };
+    statusEl.textContent = "Error: " + lastError + " — showing mock data";
+    statusEl.className = "live-status err";
+  } else {
+    liveData = { connected:true, quotes, vix, lastFetch:new Date(), error:lastError };
     statusEl.textContent = `Connected — live as of ${liveData.lastFetch.toLocaleTimeString()}` +
       (vix === null ? " · VIX unavailable, using mock" : "") +
-      (gotCount < symbols.length ? ` · ${gotCount}/${symbols.length} symbols resolved` : "");
+      (gotCount < symbols.length ? ` · ${gotCount}/${symbols.length} symbols resolved` : "") +
+      (lastError ? ` · note: ${lastError}` : "");
     statusEl.className = "live-status ok";
-  } catch (err) {
-    liveData = { connected:false, quotes:{}, vix:null, lastFetch:null, error:err.message };
-    statusEl.textContent = "Error: " + err.message + " — showing mock data";
-    statusEl.className = "live-status err";
   }
 
   updateDataBadge();
