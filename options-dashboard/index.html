@@ -21,6 +21,7 @@
     --neg:            #e34948;   /* diverging − pole (loss)   */
     --good-text:      #006300;   /* delta text, up-is-good    */
     --bad-text:       #d03b3b;
+    --warn-text:      #92660a;   /* darker amber — legible as text/icon on light */
     --accent-wash:    rgba(42,120,214,0.10);
     --neg-wash:       rgba(227,73,72,0.10);
     --hover-wash:     rgba(11,11,11,0.04);
@@ -28,6 +29,10 @@
     --vix-normal:     #2a78d6;   /* sequential step 450 */
     --vix-high:       #104281;   /* sequential step 650 */
     --vix-track:      #e1e0d9;
+    --status-good:    #0ca30c;   /* meter fills — status palette, fixed */
+    --status-warn:    #fab219;
+    --status-bad:     #d03b3b;
+    --meter-track:    #e1e0d9;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) .viz-root {
@@ -45,6 +50,7 @@
       --neg:            #e66767;
       --good-text:      #0ca30c;
       --bad-text:       #e66767;
+      --warn-text:      #eda100;
       --accent-wash:    rgba(57,135,229,0.12);
       --neg-wash:       rgba(230,103,103,0.12);
       --hover-wash:     rgba(255,255,255,0.05);
@@ -52,6 +58,10 @@
       --vix-normal:     #3987e5;
       --vix-high:       #1c5cab;
       --vix-track:      #2c2c2a;
+      --status-good:    #0ca30c;
+      --status-warn:    #fab219;
+      --status-bad:     #e66767;
+      --meter-track:    #2c2c2a;
     }
   }
   :root[data-theme="dark"] .viz-root {
@@ -69,6 +79,7 @@
     --neg:            #e66767;
     --good-text:      #0ca30c;
     --bad-text:       #e66767;
+    --warn-text:      #eda100;
     --accent-wash:    rgba(57,135,229,0.12);
     --neg-wash:       rgba(230,103,103,0.12);
     --hover-wash:     rgba(255,255,255,0.05);
@@ -76,6 +87,10 @@
     --vix-normal:     #3987e5;
     --vix-high:       #1c5cab;
     --vix-track:      #2c2c2a;
+    --status-good:    #0ca30c;
+    --status-warn:    #fab219;
+    --status-bad:     #e66767;
+    --meter-track:    #2c2c2a;
   }
 
   /* ---------- layout ---------- */
@@ -192,6 +207,52 @@
   .sym { font-weight: 650; }
   .strat { color: var(--text-secondary); }
 
+  /* screener badges — icon carries status, text stays neutral ink */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11.5px; font-weight: 500; color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .badge .ic { font-weight: 700; font-size: 12px; line-height: 1; }
+  .badge.good .ic { color: var(--good-text); }
+  .badge.warn .ic { color: var(--warn-text); }
+  .badge.bad  .ic { color: var(--bad-text); }
+  .badge.neutral .ic { color: var(--text-muted); }
+  .quality-tag { color: var(--text-secondary); }
+  .quality-tag .manual-mark { color: var(--text-muted); font-size: 10.5px; margin-left: 3px; }
+
+  /* capital & allocation */
+  .cap-row { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
+  .cap-input-block label { display: block; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 4px; }
+  .cap-input-block input {
+    font: inherit; font-size: 20px; font-weight: 650; color: var(--text-primary);
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 10px; width: 160px; font-variant-numeric: tabular-nums;
+  }
+  .cap-stat { min-width: 110px; }
+  .cap-stat .label { font-size: 12px; color: var(--text-secondary); }
+  .cap-stat .value { font-size: 20px; font-weight: 650; margin-top: 2px; }
+  .meter-wrap { margin-top: 4px; }
+  .meter-track { height: 12px; border-radius: 6px; background: var(--meter-track); position: relative; overflow: hidden; }
+  .meter-fill { height: 100%; border-radius: 6px 0 0 6px; }
+  .meter-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .alloc-bars { margin-top: 14px; }
+  .alloc-row { display: grid; grid-template-columns: 56px 1fr 90px; align-items: center; gap: 10px; padding: 4px 0; }
+  .alloc-row .sym-lbl { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+  .alloc-row .bar-track { height: 10px; background: var(--grid); border-radius: 5px; overflow: hidden; }
+  .alloc-row .bar-fill { height: 100%; background: var(--series-1); border-radius: 5px; }
+  .alloc-row .amt { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+
+  /* market clock */
+  .clock-row { display: flex; gap: 32px; flex-wrap: wrap; }
+  .clock-block { min-width: 180px; }
+  .clock-block .clabel { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .clock-block .ctime { font-size: 26px; font-weight: 650; margin: 2px 0 1px; font-variant-numeric: tabular-nums; }
+  .clock-block .csub { font-size: 11.5px; color: var(--text-muted); }
+  .expiry-note { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--grid); font-size: 12.5px; color: var(--text-secondary); }
+  .expiry-note b { color: var(--text-primary); }
+
   /* payoff strategy select */
   select {
     font: inherit; font-size: 12.5px; color: var(--text-primary);
@@ -254,6 +315,49 @@
     </div>
   </section>
 
+  <!-- Market clock -->
+  <section class="card span-6">
+    <h2>NYSE &amp; NASDAQ — market clock</h2>
+    <div class="h2sub">Both exchanges share the same 9:30am–4:00pm ET session · US holidays not accounted for</div>
+    <div class="clock-row">
+      <div class="clock-block">
+        <div class="clabel"><span class="status-dot" id="mkt-dot"></span><span id="mkt-status">—</span></div>
+        <div class="ctime" id="mkt-time-ny">—</div>
+        <div class="csub">New York (ET)</div>
+      </div>
+      <div class="clock-block">
+        <div class="clabel">Your local time</div>
+        <div class="ctime" id="mkt-time-au">—</div>
+        <div class="csub" id="mkt-tz-au">Sydney/Melbourne (AU)</div>
+      </div>
+      <div class="clock-block">
+        <div class="clabel" id="mkt-countdown-label">—</div>
+        <div class="ctime" id="mkt-countdown">—</div>
+        <div class="csub" id="mkt-countdown-sub">&nbsp;</div>
+      </div>
+    </div>
+    <div class="expiry-note" id="expiry-note">Next monthly expiration (3rd Friday): <b>—</b></div>
+  </section>
+
+  <!-- Capital & allocation -->
+  <section class="card span-6">
+    <h2>Capital &amp; allocation</h2>
+    <div class="h2sub">Set your trading capital — saved locally in this browser</div>
+    <div class="cap-row">
+      <div class="cap-input-block">
+        <label for="cap-input">Total capital ($)</label>
+        <input id="cap-input" type="number" min="0" step="1000" inputmode="decimal">
+      </div>
+      <div class="cap-stat"><div class="label">Allocated</div><div class="value" id="cap-allocated">—</div></div>
+      <div class="cap-stat"><div class="label">Available</div><div class="value" id="cap-available">—</div></div>
+    </div>
+    <div class="meter-wrap">
+      <div class="meter-track"><div class="meter-fill" id="cap-meter-fill"></div></div>
+      <div class="meter-labels"><span id="cap-meter-pct">0% allocated</span><span>100%</span></div>
+    </div>
+    <div class="alloc-bars" id="alloc-bars"></div>
+  </section>
+
   <!-- P&L curve -->
   <section class="card span-8">
     <h2>Cumulative P&amp;L</h2>
@@ -305,6 +409,36 @@
     </div>
   </section>
 
+  <!-- Trade tracker -->
+  <section class="card span-12">
+    <h2>Trade tracker</h2>
+    <div class="h2sub">Entry checklist: Δ .15–.4 · IV rank &gt;30 · gamma lower is better · theta working in your favour · DTE 30–45 &nbsp;·&nbsp; exit rule: take profit at 50–70% of max, let it expire once premium's nearly gone</div>
+    <div class="tbl-scroll">
+      <table id="tracker">
+        <thead><tr>
+          <th>Symbol</th><th>Strategy</th><th>Capital</th><th>Opened</th><th>DTE@entry</th><th>Days held</th>
+          <th>Δ</th><th>IV rank</th><th>Γ</th><th>Θ</th><th>Max profit</th><th>Current P&amp;L</th><th>% captured</th><th>Action</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Screener -->
+  <section class="card span-12">
+    <h2>Wheel screener — candidate watchlist</h2>
+    <div class="h2sub">Volume 5M+ ideal / 2M+ min · OI 1000+ ideal / 500+ min · spread ≤$0.20 preferred · IV 25–50% healthy · target Δ .30–.40 · quality is a manual call</div>
+    <div class="tbl-scroll">
+      <table id="screener">
+        <thead><tr>
+          <th>Symbol</th><th>Quality</th><th>Avg volume</th><th>Option OI</th>
+          <th>Spread</th><th>IV</th><th>Price</th><th>Contract $</th><th>Earnings</th><th>Target Δ</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <p class="foot-note">Template with generated placeholder data — wire your broker API in <code>mockData()</code>. Not investment advice.</p>
 </div>
 
@@ -334,8 +468,48 @@ function mockData() {
     { sym:"AMD",  strat:"Cash-secured put 150P",       exp:"2026-09-18", dte:63, qty:-1, entry:4.20, mark:3.10, delta:+31,  theta:+3.2,  iv:0.38 },
   ];
   positions.forEach(p => p.pnl = Math.round((p.mark - p.entry) * 100 * p.qty));
+
+  // watchlist: current position symbols + a few new candidates, scored
+  // against the 7-point Wheel checklist (avgVol shares/day, oi contracts,
+  // spread $, iv 0-1, price $, earningsDays until next print, delta 0-1)
+  const screener = [
+    { sym:"SPY",   quality:"Index ETF",                    avgVol:75_000_000, oi:15000, spread:0.02, iv:0.13, price:561, earningsDays:null, delta:0.32 },
+    { sym:"QQQ",   quality:"Index ETF",                    avgVol:40_000_000, oi:9000,  spread:0.03, iv:0.18, price:498, earningsDays:null, delta:0.35 },
+    { sym:"NVDA",  quality:"High quality — growth leader",  avgVol:45_000_000, oi:4500,  spread:0.05, iv:0.42, price:172, earningsDays:12,   delta:0.29 },
+    { sym:"AAPL",  quality:"High quality — blue chip",      avgVol:55_000_000, oi:3200,  spread:0.04, iv:0.24, price:231, earningsDays:34,   delta:0.36 },
+    { sym:"TSLA",  quality:"Speculative — high beta",       avgVol:90_000_000, oi:5200,  spread:0.08, iv:0.55, price:318, earningsDays:8,    delta:0.41 },
+    { sym:"AMD",   quality:"High quality — cyclical",       avgVol:48_000_000, oi:2100,  spread:0.06, iv:0.38, price:152, earningsDays:51,   delta:0.33 },
+    { sym:"MSFT",  quality:"High quality — blue chip",      avgVol:22_000_000, oi:1800,  spread:0.05, iv:0.22, price:452, earningsDays:40,   delta:0.31 },
+    { sym:"GOOGL", quality:"High quality — blue chip",      avgVol:28_000_000, oi:1200,  spread:0.22, iv:0.29, price:186, earningsDays:45,   delta:0.44 },
+    { sym:"JPM",   quality:"High quality — blue chip",      avgVol:9_000_000,  oi:850,   spread:0.38, iv:0.27, price:214, earningsDays:19,   delta:0.28 },
+  ];
+
+  // trade tracker: open + recently closed Wheel trades, scored against the
+  // entry checklist (delta .15-.4, iv rank, gamma, theta) and the 50-70%
+  // profit-taking rule. dteAtEntry/daysHeld/opened are used to flag trades
+  // that hit target quickly ("fast cycles").
+  const mkDate = daysAgo => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return d; };
+  const trades = [
+    { sym:"AAPL", strat:"Cash-secured put 220P", capital:22000, opened:mkDate(15), dteAtEntry:30, daysHeld:15,
+      delta:0.32, ivRank:38, gamma:0.015, theta:5.2, entryCredit:3.10, value:0.85, status:"open" },
+    { sym:"AMD",  strat:"Cash-secured put 150P", capital:15000, opened:mkDate(10), dteAtEntry:30, daysHeld:10,
+      delta:0.28, ivRank:33, gamma:0.020, theta:3.1, entryCredit:2.10, value:1.65, status:"open" },
+    { sym:"MSFT", strat:"Covered call 460C",     capital:45000, opened:mkDate(25), dteAtEntry:30, daysHeld:25,
+      delta:0.18, ivRank:29, gamma:0.008, theta:1.0, entryCredit:4.20, value:0.30, status:"open" },
+    { sym:"TSLA", strat:"Cash-secured put 300P", capital:30000, opened:mkDate(5),  dteAtEntry:40, daysHeld:5,
+      delta:0.38, ivRank:47, gamma:0.012, theta:4.4, entryCredit:6.80, value:6.10, status:"open" },
+    { sym:"NVDA", strat:"Covered call 180C",     capital:17200, opened:mkDate(33), dteAtEntry:35, daysHeld:33,
+      delta:0.12, ivRank:41, gamma:0.006, theta:0.4, entryCredit:3.40, value:0.05, status:"open" },
+    { sym:"QQQ",  strat:"Cash-secured put 480P", capital:24000, opened:mkDate(15), dteAtEntry:30, daysHeld:15,
+      delta:0.34, ivRank:36, gamma:0.014, theta:6.0, entryCredit:5.10, value:1.48, status:"closed", outcome:"profit" },
+    { sym:"JPM",  strat:"Cash-secured put 200P", capital:20000, opened:mkDate(35), dteAtEntry:35, daysHeld:35,
+      delta:0.22, ivRank:31, gamma:0.010, theta:3.8, entryCredit:2.85, value:0.00, status:"closed", outcome:"expired" },
+    { sym:"GOOGL",strat:"Cash-secured put 175P", capital:17500, opened:mkDate(22), dteAtEntry:30, daysHeld:22,
+      delta:0.30, ivRank:34, gamma:0.016, theta:4.0, entryCredit:2.40, value:1.08, status:"closed", outcome:"profit" },
+  ];
+
   return {
-    curve, positions, vix: 27.3,
+    curve, positions, screener, trades, vix: 27.3,
     account: { netLiq: 84760, dayPnl: +642, openPnl: positions.reduce((s,p)=>s+p.pnl,0),
                buyingPower: 31240,
                delta: positions.reduce((s,p)=>s+p.delta,0),
@@ -712,14 +886,259 @@ function renderTable() {
   }
 }
 
+/* ---------- screener / watchlist ---------- */
+const fmtVol = n => (n/1_000_000).toFixed(1) + "M";
+function volStatus(v)     { return v >= 5_000_000 ? ["good","✓","Ideal"] : v >= 2_000_000 ? ["warn","~","Min"] : ["bad","✗","Low"]; }
+function oiStatus(o)      { return o >= 1000       ? ["good","✓","Ideal"] : o >= 500       ? ["warn","~","Min"] : ["bad","✗","Low"]; }
+function spreadStatus(s)  { return s <= 0.20        ? ["good","✓","Tight"] : s <= 0.35      ? ["warn","~","Wide"] : ["bad","✗","Wide"]; }
+function ivStatus(iv)     { return iv < 0.25 ? ["warn","~","Low"] : iv <= 0.50 ? ["good","✓","Healthy"] : ["warn","~","High"]; }
+function earningsStatus(d){
+  if (d === null) return ["neutral","–","No earnings"];
+  return d < 14 ? ["warn","~",`In ${d}d`] : ["good","✓",`Clear (${d}d)`];
+}
+function deltaStatus(d)   { return (d >= 0.30 && d <= 0.40) ? ["good","✓","In range"] : ["warn","~","Outside .30–.40"]; }
+
+function badgeCell(value, status) {
+  const td = document.createElement("td");
+  const span = document.createElement("span");
+  span.className = "badge " + status[0];
+  const ic = document.createElement("span"); ic.className = "ic"; ic.textContent = status[1];
+  const label = document.createTextNode(` ${value} · ${status[2]}`);
+  span.append(ic, label);
+  td.append(span);
+  return td;
+}
+function renderScreener() {
+  const tb = document.querySelector("#screener tbody");
+  for (const s of DATA.screener) {
+    const tr = document.createElement("tr");
+
+    const symTd = document.createElement("td"); symTd.className = "sym"; symTd.textContent = s.sym;
+    const qTd = document.createElement("td"); qTd.className = "quality-tag"; qTd.textContent = s.quality;
+    const mark = document.createElement("span"); mark.className = "manual-mark"; mark.textContent = "(manual)";
+    qTd.append(mark);
+    tr.append(symTd, qTd);
+
+    tr.append(badgeCell(fmtVol(s.avgVol), volStatus(s.avgVol)));
+    tr.append(badgeCell(s.oi.toLocaleString("en-US"), oiStatus(s.oi)));
+    tr.append(badgeCell(fmt$2(s.spread), spreadStatus(s.spread)));
+    tr.append(badgeCell(Math.round(s.iv*100)+"%", ivStatus(s.iv)));
+
+    const priceTd = document.createElement("td"); priceTd.textContent = fmt$2(s.price);
+    const contractTd = document.createElement("td"); contractTd.textContent = fmt$(s.price*100);
+    tr.append(priceTd, contractTd);
+
+    tr.append(badgeCell(s.earningsDays===null ? "—" : `${s.earningsDays}d`, earningsStatus(s.earningsDays)));
+    tr.append(badgeCell(s.delta.toFixed(2), deltaStatus(s.delta)));
+
+    tb.append(tr);
+  }
+}
+
+/* ---------- trade tracker: checklist + 50-70% exit rule ---------- */
+function deltaChecklistStatus(d) { return (d >= 0.15 && d <= 0.40) ? ["good","✓","OK"] : ["warn","~","Outside .15–.4"]; }
+function ivRankStatus(r)         { return r > 30 ? ["good","✓","OK"] : ["warn","~","Below 30"]; }
+function gammaChecklistStatus(g) { return g <= 0.012 ? ["good","✓","Low"] : g <= 0.018 ? ["warn","~","Moderate"] : ["bad","✗","High"]; }
+function thetaChecklistStatus(t) { return t > 0 ? ["good","✓","Favourable"] : ["bad","✗","Against you"]; }
+function dteEntryStatus(d)       { return (d >= 30 && d <= 45) ? ["good","✓","OK"] : ["warn","~","Outside 30–45"]; }
+
+function actionBadgeCell(status) {
+  const td = document.createElement("td");
+  const span = document.createElement("span");
+  span.className = "badge " + status[0];
+  const ic = document.createElement("span"); ic.className = "ic"; ic.textContent = status[1];
+  span.append(ic, document.createTextNode(" " + status[2]));
+  td.append(span);
+  return td;
+}
+
+function renderTracker() {
+  const tb = document.querySelector("#tracker tbody");
+  for (const t of DATA.trades) {
+    const tr = document.createElement("tr");
+
+    const symTd = document.createElement("td"); symTd.className = "sym"; symTd.textContent = t.sym;
+    const stratTd = document.createElement("td"); stratTd.className = "strat"; stratTd.textContent = t.strat;
+    const capTd = document.createElement("td"); capTd.textContent = fmt$(t.capital);
+    const openTd = document.createElement("td"); openTd.textContent = fmtD(t.opened);
+    tr.append(symTd, stratTd, capTd, openTd);
+
+    tr.append(badgeCell(t.dteAtEntry + "d", dteEntryStatus(t.dteAtEntry)));
+
+    const heldTd = document.createElement("td"); heldTd.textContent = t.daysHeld + "d";
+    tr.append(heldTd);
+
+    tr.append(badgeCell(t.delta.toFixed(2), deltaChecklistStatus(t.delta)));
+    tr.append(badgeCell(t.ivRank, ivRankStatus(t.ivRank)));
+    tr.append(badgeCell(t.gamma.toFixed(3), gammaChecklistStatus(t.gamma)));
+    tr.append(badgeCell("+" + t.theta.toFixed(1), thetaChecklistStatus(t.theta)));
+
+    const maxProfit = t.entryCredit * 100;
+    const pnl = (t.entryCredit - t.value) * 100;
+    const captured = pnl / maxProfit;
+
+    const maxTd = document.createElement("td"); maxTd.textContent = fmt$(Math.round(maxProfit));
+    const pnlTd = document.createElement("td"); pnlTd.textContent = fmt$(Math.round(pnl));
+    pnlTd.className = "pnl " + (pnl >= 0 ? "up" : "down");
+    const capPctTd = document.createElement("td"); capPctTd.textContent = Math.round(captured * 100) + "%";
+    tr.append(maxTd, pnlTd, capPctTd);
+
+    let action;
+    if (t.status === "closed") {
+      action = t.outcome === "expired"
+        ? ["good","✓","Expired — full profit"]
+        : ["good","✓","Closed — took profit"];
+    } else if (captured >= 0.90) {
+      action = ["good","✓","Let it expire"];
+    } else if (captured >= 0.70) {
+      const fast = t.daysHeld <= t.dteAtEntry * 0.5;
+      action = ["good","✓", fast ? "Take profit ⚡ fast cycle" : "Take profit"];
+    } else if (captured >= 0.50) {
+      action = ["warn","~","Consider closing"];
+    } else {
+      action = ["neutral","–","Hold"];
+    }
+    tr.append(actionBadgeCell(action));
+
+    tb.append(tr);
+  }
+}
+
+/* ---------- capital & allocation ---------- */
+const CAPITAL_KEY = "wheelDashCapital";
+const DEFAULT_CAPITAL = 140000;
+function getCapital() {
+  const saved = localStorage.getItem(CAPITAL_KEY);
+  const n = parseFloat(saved);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_CAPITAL;
+}
+function renderCapital() {
+  const capital = getCapital();
+  document.getElementById("cap-input").value = capital;
+
+  const openTrades = DATA.trades.filter(t => t.status === "open");
+  const allocated = openTrades.reduce((s,t) => s + t.capital, 0);
+  const available = capital - allocated;
+  const pct = capital > 0 ? allocated / capital : 0;
+
+  document.getElementById("cap-allocated").textContent = fmt$(allocated);
+  document.getElementById("cap-available").textContent = fmt$(available);
+  document.getElementById("cap-meter-pct").textContent = Math.round(pct*100) + "% allocated";
+
+  const fill = document.getElementById("cap-meter-fill");
+  fill.style.width = Math.min(100, Math.max(0, pct*100)) + "%";
+  fill.style.background = pct < 0.6 ? css("--status-good") : pct < 0.85 ? css("--status-warn") : css("--status-bad");
+
+  const bySym = {};
+  for (const t of openTrades) bySym[t.sym] = (bySym[t.sym] || 0) + t.capital;
+  const rows = Object.entries(bySym).sort((a,b) => b[1]-a[1]);
+  const maxAmt = Math.max(...rows.map(r => r[1]), 1);
+  const wrap = document.getElementById("alloc-bars");
+  wrap.textContent = "";
+  for (const [sym, amt] of rows) {
+    const row = document.createElement("div"); row.className = "alloc-row";
+    const symLbl = document.createElement("div"); symLbl.className = "sym-lbl"; symLbl.textContent = sym;
+    const track = document.createElement("div"); track.className = "bar-track";
+    const barFill = document.createElement("div"); barFill.className = "bar-fill";
+    barFill.style.width = (amt/maxAmt*100) + "%";
+    track.append(barFill);
+    const amtLbl = document.createElement("div"); amtLbl.className = "amt"; amtLbl.textContent = fmt$(amt);
+    row.append(symLbl, track, amtLbl);
+    wrap.append(row);
+  }
+}
+
+/* ---------- NYSE/NASDAQ market clock (AU-local) ---------- */
+const WEEKDAY_INDEX = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+function nyParts(date) {
+  const fmt = new Intl.DateTimeFormat("en-US", { timeZone:"America/New_York",
+    year:"numeric", month:"2-digit", day:"2-digit",
+    hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false, weekday:"short" });
+  const parts = {};
+  for (const p of fmt.formatToParts(date)) parts[p.type] = p.value;
+  return parts;
+}
+function marketStatus(now) {
+  const p = nyParts(now);
+  const hour = p.hour === "24" ? 0 : +p.hour;
+  const fakeNow = Date.UTC(+p.year, +p.month-1, +p.day, hour, +p.minute, +p.second);
+  const wd = WEEKDAY_INDEX[p.weekday];
+  const minutesOfDay = hour*60 + (+p.minute) + (+p.second)/60;
+  const isWeekday = wd >= 1 && wd <= 5;
+  const isOpen = isWeekday && minutesOfDay >= 9*60+30 && minutesOfDay < 16*60;
+
+  const todayOpen  = Date.UTC(+p.year, +p.month-1, +p.day, 9, 30, 0);
+  const todayClose = Date.UTC(+p.year, +p.month-1, +p.day, 16, 0, 0);
+
+  let targetFake, label;
+  if (isOpen) {
+    targetFake = todayClose; label = "Closes in";
+  } else if (isWeekday && fakeNow < todayOpen) {
+    targetFake = todayOpen; label = "Opens in";
+  } else {
+    let addDays = 1, nextWd = (wd+1) % 7;
+    while (nextWd === 0 || nextWd === 6) { addDays++; nextWd = (nextWd+1) % 7; }
+    targetFake = todayOpen + addDays*86400000;
+    label = "Opens in";
+  }
+  return { isOpen, diffMs: targetFake - fakeNow, label };
+}
+function fmtCountdown(ms) {
+  const totalMin = Math.max(0, Math.round(ms/60000));
+  return `${Math.floor(totalMin/60)}h ${totalMin%60}m`;
+}
+function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+function thirdFriday(year, monthIndex) {
+  const d = new Date(year, monthIndex, 1);
+  let count = 0;
+  while (true) {
+    if (d.getDay() === 5) { count++; if (count === 3) return new Date(d); }
+    d.setDate(d.getDate()+1);
+  }
+}
+function nextThirdFriday(from) {
+  const tf = thirdFriday(from.getFullYear(), from.getMonth());
+  return startOfDay(tf) < startOfDay(from) ? thirdFriday(from.getFullYear(), from.getMonth()+1) : tf;
+}
+function renderClock() {
+  const now = new Date();
+  const st = marketStatus(now);
+
+  document.getElementById("mkt-status").textContent = st.isOpen ? "Market open" : "Market closed";
+  document.getElementById("mkt-dot").style.background = st.isOpen ? css("--status-good") : css("--text-muted");
+
+  document.getElementById("mkt-time-ny").textContent =
+    new Intl.DateTimeFormat("en-US", { timeZone:"America/New_York", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:true }).format(now);
+  document.getElementById("mkt-time-au").textContent =
+    new Intl.DateTimeFormat("en-AU", { timeZone:"Australia/Sydney", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:true }).format(now);
+
+  document.getElementById("mkt-countdown-label").textContent = st.label;
+  document.getElementById("mkt-countdown").textContent = fmtCountdown(st.diffMs);
+
+  const exp = nextThirdFriday(now);
+  const daysTo = Math.round((startOfDay(exp) - startOfDay(now)) / 86400000);
+  const note = document.getElementById("expiry-note");
+  note.textContent = "Next monthly expiration (3rd Friday): ";
+  const b = document.createElement("b");
+  b.textContent = exp.toLocaleDateString("en-US",{weekday:"short",month:"long",day:"numeric"}) +
+    (daysTo === 0 ? " — today" : ` — in ${daysTo}d`);
+  note.append(b);
+}
+
 /* ---------- boot & wiring ---------- */
 let currentRange = 90;
 renderTiles();
 renderVix();
+renderClock();
+renderCapital();
 renderTable();
+renderTracker();
+renderScreener();
 renderDelta();
 renderPnl(currentRange);
 renderPayoff("ironCondor");
+
+setInterval(renderClock, 1000);
 
 document.querySelectorAll(".range-btn").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll(".range-btn").forEach(x=>x.setAttribute("aria-pressed","false"));
@@ -728,6 +1147,11 @@ document.querySelectorAll(".range-btn").forEach(b => b.addEventListener("click",
   renderPnl(currentRange);
 }));
 document.getElementById("strategy").addEventListener("change", e => renderPayoff(e.target.value));
+document.getElementById("cap-input").addEventListener("input", e => {
+  const v = parseFloat(e.target.value);
+  if (Number.isFinite(v) && v >= 0) localStorage.setItem(CAPITAL_KEY, v);
+  renderCapital();
+});
 
 // re-render charts on resize / theme change
 let rt; window.addEventListener("resize", () => {
@@ -735,7 +1159,7 @@ let rt; window.addEventListener("resize", () => {
   rt = setTimeout(() => { renderPnl(currentRange); renderPayoff(document.getElementById("strategy").value); renderDelta(); renderVix(); }, 150);
 });
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  renderPnl(currentRange); renderPayoff(document.getElementById("strategy").value); renderDelta(); renderVix();
+  renderPnl(currentRange); renderPayoff(document.getElementById("strategy").value); renderDelta(); renderVix(); renderClock(); renderCapital();
 });
 </script>
 </body>
