@@ -412,12 +412,27 @@
   <!-- Trade tracker -->
   <section class="card span-12">
     <h2>Trade tracker</h2>
-    <div class="h2sub">Entry checklist: Δ .15–.4 · IV rank &gt;30 · gamma lower is better · theta working in your favour · DTE 30–45 &nbsp;·&nbsp; exit rule: take profit at 50–70% of max, let it expire once premium's nearly gone &nbsp;·&nbsp; Profit = premium received − closing cost (full premium if expired worthless) &nbsp;·&nbsp; COCR = premium received ÷ capital required</div>
+    <div class="h2sub">Entry checklist: Δ .15–.4 · IV rank &gt;30 · gamma lower is better · theta working in your favour · DTE 30–45 &nbsp;·&nbsp; exit rule: take profit at 50–70% of max, let it expire once premium's nearly gone &nbsp;·&nbsp; Profit = premium received − closing cost (full premium if expired worthless) &nbsp;·&nbsp; COCR = premium received ÷ capital required &nbsp;·&nbsp; COCR (ann.) = COCR ÷ days held × 365, for ranking trades by capital velocity</div>
     <div class="tbl-scroll">
       <table id="tracker">
         <thead><tr>
           <th>Symbol</th><th>Strategy</th><th>Capital</th><th>Opened</th><th>DTE@entry</th><th>Days held</th>
-          <th>Δ</th><th>IV rank</th><th>Γ</th><th>Θ</th><th>Max profit</th><th>Profit</th><th>% captured</th><th>COCR</th><th>Action</th>
+          <th>Δ</th><th>IV rank</th><th>Γ</th><th>Θ</th><th>Max profit</th><th>Profit</th><th>% captured</th><th>COCR</th><th>COCR (ann.)</th><th>Action</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Roll chains -->
+  <section class="card span-12">
+    <h2>Roll chains — multi-leg positions tracked as one</h2>
+    <div class="h2sub">Net credit = sum of premiums received across all legs − sum of debits paid to close/roll &nbsp;·&nbsp; Effective price = final strike adjusted for all rolled premium (put: strike − net credit · call: strike + net credit)</div>
+    <div class="tbl-scroll">
+      <table id="chains">
+        <thead><tr>
+          <th>Symbol</th><th>Type</th><th>Strike path</th><th>Rolls</th><th>Opened</th><th>Days in chain</th>
+          <th>Net credit</th><th>Effective price</th><th>Status</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -532,8 +547,18 @@ function mockData() {
     { sym:"NVDA", shares:100, assignedStrike:175, assignPremium:2.60, currentPrice:172, cc:{ strike:180, premium:3.40 } },
   ];
 
+  // roll chains: a position rolled one or more times, tracked as a single
+  // continuous trade rather than unrelated legs. netCredit = sum of every
+  // leg's credit minus every roll's closing debit.
+  const rollChains = [
+    { sym:"TSLA", underlyingType:"put", strikes:[320,300,290], credits:[5.20,8.10,5.90], debits:[6.80,3.50],
+      opened:mkDate(58), dte:35, status:"open" },
+    { sym:"AMD", underlyingType:"call", strikes:[145,155], credits:[2.20,3.90], debits:[4.80],
+      opened:mkDate(40), dte:0, status:"assigned" },
+  ];
+
   return {
-    curve, positions, screener, trades, shareLots, vix: 27.3,
+    curve, positions, screener, trades, shareLots, rollChains, vix: 27.3,
     account: { netLiq: 84760, dayPnl: +642, openPnl: positions.reduce((s,p)=>s+p.pnl,0),
                buyingPower: 31240,
                delta: positions.reduce((s,p)=>s+p.delta,0),
@@ -1001,13 +1026,16 @@ function renderTracker() {
     const profit = (t.entryCredit - t.value) * 100; // premium received − closing cost (0 if expired worthless)
     const captured = profit / maxProfit;
     const cocr = maxProfit / t.capital * 100;        // premium received ÷ capital required
+    const cocrAnn = cocr / Math.max(t.daysHeld, 1) * 365; // capital velocity — ranks fast cycles fairly
 
     const maxTd = document.createElement("td"); maxTd.textContent = fmt$(Math.round(maxProfit));
     const profitTd = document.createElement("td"); profitTd.textContent = fmt$(Math.round(profit));
     profitTd.className = "pnl " + (profit >= 0 ? "up" : "down");
     const capPctTd = document.createElement("td"); capPctTd.textContent = Math.round(captured * 100) + "%";
     const cocrTd = document.createElement("td"); cocrTd.textContent = cocr.toFixed(1) + "%";
-    tr.append(maxTd, profitTd, capPctTd, cocrTd);
+    const cocrAnnTd = document.createElement("td"); cocrAnnTd.textContent = cocrAnn.toFixed(0) + "%";
+    cocrAnnTd.style.fontWeight = "650";
+    tr.append(maxTd, profitTd, capPctTd, cocrTd, cocrAnnTd);
 
     let action;
     if (t.status === "closed") {
@@ -1064,6 +1092,41 @@ function renderShareLots() {
       const dashTd2 = document.createElement("td"); dashTd2.textContent = "—";
       tr.append(noneTd, dashTd1, dashTd2);
     }
+
+    tb.append(tr);
+  }
+}
+
+/* ---------- roll chains: multi-leg positions tracked as one ---------- */
+function renderRollChains() {
+  const tb = document.querySelector("#chains tbody");
+  const today = new Date();
+  for (const c of DATA.rollChains) {
+    const netCredit = c.credits.reduce((s,v) => s+v, 0) - c.debits.reduce((s,v) => s+v, 0);
+    const currentStrike = c.strikes[c.strikes.length-1];
+    const effectivePrice = c.underlyingType === "put" ? currentStrike - netCredit : currentStrike + netCredit;
+    const rolls = c.strikes.length - 1;
+    const daysInChain = Math.round((today - c.opened) / 86400000);
+
+    const tr = document.createElement("tr");
+    const symTd = document.createElement("td"); symTd.className = "sym"; symTd.textContent = c.sym;
+    const typeTd = document.createElement("td"); typeTd.className = "strat"; typeTd.textContent = c.underlyingType === "put" ? "Put" : "Call";
+    const pathTd = document.createElement("td"); pathTd.textContent = c.strikes.map(s => fmt$2(s)).join(" → ");
+    const rollsTd = document.createElement("td"); rollsTd.textContent = rolls;
+    const openedTd = document.createElement("td"); openedTd.textContent = fmtD(c.opened);
+    const daysTd = document.createElement("td"); daysTd.textContent = daysInChain + "d";
+    tr.append(symTd, typeTd, pathTd, rollsTd, openedTd, daysTd);
+
+    const netTd = document.createElement("td"); netTd.textContent = fmt$(Math.round(netCredit*100));
+    netTd.className = "pnl " + (netCredit >= 0 ? "up" : "down");
+    const effTd = document.createElement("td"); effTd.textContent = fmt$2(effectivePrice);
+    effTd.style.fontWeight = "650";
+    tr.append(netTd, effTd);
+
+    const statusLabel = c.status === "open" ? ["neutral","●","Open"]
+      : c.status === "assigned" ? ["good","✓","Assigned / called away"]
+      : ["good","✓","Closed"];
+    tr.append(actionBadgeCell(statusLabel));
 
     tb.append(tr);
   }
@@ -1199,6 +1262,7 @@ renderCapital();
 renderTable();
 renderTracker();
 renderShareLots();
+renderRollChains();
 renderScreener();
 renderDelta();
 renderPnl(currentRange);
