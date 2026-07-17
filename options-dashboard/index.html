@@ -152,6 +152,30 @@
   .live-link:hover { text-decoration: underline; }
   .live-note { color: var(--text-muted); font-size: 11px; margin: 0 0 14px; max-width: 900px; }
 
+  /* editable-record forms & row actions (trades / chains / lots) */
+  .h2-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .h2-actions { display: flex; gap: 8px; flex: none; }
+  .inline-form {
+    display: none; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;
+    margin: 10px 0 16px; padding: 14px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--page);
+  }
+  .inline-form.open { display: grid; }
+  .inline-form label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--text-secondary); }
+  .inline-form input, .inline-form select {
+    font: inherit; font-size: 12.5px; color: var(--text-primary);
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+  }
+  .inline-form .form-actions { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 4px; }
+  .row-actions { display: flex; gap: 6px; }
+  .row-btn {
+    font: inherit; font-size: 11px; font-weight: 500; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px;
+    padding: 2px 8px; cursor: pointer; white-space: nowrap;
+  }
+  .row-btn:hover { background: var(--hover-wash); }
+  .row-btn.danger { color: var(--bad-text); }
+
   .grid {
     display: grid; gap: 14px;
     grid-template-columns: repeat(12, 1fr);
@@ -453,13 +477,36 @@
 
   <!-- Trade tracker -->
   <section class="card span-12">
-    <h2>Trade tracker</h2>
+    <h2 class="h2-row"><span>Trade tracker</span>
+      <span class="h2-actions">
+        <button class="range-btn" id="trade-add-toggle">+ Add trade</button>
+        <button class="range-btn" id="reset-demo-data">Reset to demo data</button>
+      </span>
+    </h2>
     <div class="h2sub">Entry checklist: Δ .15–.4 · IV rank &gt;30 · gamma lower is better · theta working in your favour · DTE 30–45 &nbsp;·&nbsp; exit rule: take profit at 50–70% of max, let it expire once premium's nearly gone &nbsp;·&nbsp; Profit = premium received − closing cost (full premium if expired worthless) &nbsp;·&nbsp; COCR = premium received ÷ capital required &nbsp;·&nbsp; COCR (ann.) = COCR ÷ days held × 365, for ranking trades by capital velocity</div>
+
+    <div class="inline-form" id="trade-add-form">
+      <label>Symbol <input id="ta-sym" type="text" placeholder="AAPL" style="text-transform:uppercase"></label>
+      <label>Strategy <input id="ta-strat" type="text" placeholder="Cash-secured put 220P"></label>
+      <label>Capital ($) <input id="ta-capital" type="number" min="0" step="100" placeholder="22000"></label>
+      <label>Opened <input id="ta-opened" type="date"></label>
+      <label>DTE at entry <input id="ta-dte" type="number" min="1" step="1" placeholder="30"></label>
+      <label>Delta <input id="ta-delta" type="number" min="0" max="1" step="0.01" placeholder="0.30"></label>
+      <label>IV rank <input id="ta-ivrank" type="number" min="0" max="100" step="1" placeholder="35"></label>
+      <label>Gamma <input id="ta-gamma" type="number" min="0" step="0.001" placeholder="0.015"></label>
+      <label>Theta <input id="ta-theta" type="number" step="0.1" placeholder="4.5"></label>
+      <label>Entry credit ($/sh) <input id="ta-credit" type="number" min="0" step="0.01" placeholder="3.10"></label>
+      <div class="form-actions">
+        <button class="range-btn" id="ta-submit">Add trade</button>
+        <button class="range-btn" id="ta-cancel">Cancel</button>
+      </div>
+    </div>
+
     <div class="tbl-scroll">
       <table id="tracker">
         <thead><tr>
           <th>Symbol</th><th>Strategy</th><th>Capital</th><th>Opened</th><th>DTE@entry</th><th>Days held</th>
-          <th>Δ</th><th>IV rank</th><th>Γ</th><th>Θ</th><th>Max profit</th><th>Profit</th><th>% captured</th><th>COCR</th><th>COCR (ann.)</th><th>Action</th>
+          <th>Δ</th><th>IV rank</th><th>Γ</th><th>Θ</th><th>Max profit</th><th>Profit</th><th>% captured</th><th>COCR</th><th>COCR (ann.)</th><th>Action</th><th>Manage</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -468,13 +515,31 @@
 
   <!-- Roll chains -->
   <section class="card span-12">
-    <h2>Roll chains — multi-leg positions tracked as one</h2>
+    <h2 class="h2-row"><span>Roll chains — multi-leg positions tracked as one</span>
+      <span class="h2-actions"><button class="range-btn" id="chain-add-toggle">+ Add chain</button></span>
+    </h2>
     <div class="h2sub">Net credit = sum of premiums received across all legs − sum of debits paid to close/roll &nbsp;·&nbsp; Effective price = final strike adjusted for all rolled premium (put: strike − net credit · call: strike + net credit)</div>
+
+    <div class="inline-form" id="chain-add-form">
+      <label>Symbol <input id="ca-sym" type="text" placeholder="TSLA" style="text-transform:uppercase"></label>
+      <label>Type
+        <select id="ca-type"><option value="put">Put</option><option value="call">Call</option></select>
+      </label>
+      <label>Opening strike <input id="ca-strike" type="number" min="0" step="0.5" placeholder="320"></label>
+      <label>Opening credit ($/sh) <input id="ca-credit" type="number" min="0" step="0.01" placeholder="5.20"></label>
+      <label>Opened <input id="ca-opened" type="date"></label>
+      <label>DTE (current leg) <input id="ca-dte" type="number" min="0" step="1" placeholder="35"></label>
+      <div class="form-actions">
+        <button class="range-btn" id="ca-submit">Add chain</button>
+        <button class="range-btn" id="ca-cancel">Cancel</button>
+      </div>
+    </div>
+
     <div class="tbl-scroll">
       <table id="chains">
         <thead><tr>
           <th>Symbol</th><th>Type</th><th>Strike path</th><th>Rolls</th><th>Opened</th><th>Days in chain</th>
-          <th>Net credit</th><th>Effective price</th><th>Status</th>
+          <th>Net credit</th><th>Effective price</th><th>Status</th><th>Manage</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -483,14 +548,29 @@
 
   <!-- Share lots -->
   <section class="card span-12">
-    <h2>Share lots — assigned stock</h2>
+    <h2 class="h2-row"><span>Share lots — assigned stock</span>
+      <span class="h2-actions"><button class="range-btn" id="lot-add-toggle">+ Add lot</button></span>
+    </h2>
     <div class="h2sub">Avg cost/share = assignment strike − premium received/share &nbsp;·&nbsp; Total return (if called away) = capital gain (CC strike − avg cost) + CC premium/share &nbsp;·&nbsp; Assignment risk is a simplified heuristic (ITM + ex-div within 5 days + dividend ≥$0.20), not a real pricing model — always confirm against actual extrinsic value</div>
+
+    <div class="inline-form" id="lot-add-form">
+      <label>Symbol <input id="la-sym" type="text" placeholder="TSLA" style="text-transform:uppercase"></label>
+      <label>Shares <input id="la-shares" type="number" min="1" step="1" placeholder="100"></label>
+      <label>Assigned strike <input id="la-strike" type="number" min="0" step="0.5" placeholder="290"></label>
+      <label>Premium received/sh <input id="la-premium" type="number" min="0" step="0.01" placeholder="4.50"></label>
+      <label>Current price <input id="la-price" type="number" min="0" step="0.01" placeholder="318"></label>
+      <div class="form-actions">
+        <button class="range-btn" id="la-submit">Add lot</button>
+        <button class="range-btn" id="la-cancel">Cancel</button>
+      </div>
+    </div>
+
     <div class="tbl-scroll">
       <table id="lots">
         <thead><tr>
           <th>Symbol</th><th>Shares</th><th>Assigned strike</th><th>Premium/sh</th><th>Avg cost/sh</th>
           <th>Current price</th><th>Unrealized</th><th>Active CC</th><th>Total return/sh</th><th>Total return</th>
-          <th>Next ex-div</th><th>Assignment risk</th>
+          <th>Next ex-div</th><th>Assignment risk</th><th>Manage</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -562,23 +642,25 @@ function mockData() {
   // profit-taking rule. dteAtEntry/daysHeld/opened are used to flag trades
   // that hit target quickly ("fast cycles").
   const mkDate = daysAgo => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); return d; };
+  // daysHeld is computed from opened/closedDate (see tradeDaysHeld), not
+  // stored — so it actually advances day to day instead of staying frozen.
   const trades = [
-    { sym:"AAPL", strat:"Cash-secured put 220P", capital:22000, opened:mkDate(15), dteAtEntry:30, daysHeld:15,
-      delta:0.32, ivRank:38, gamma:0.015, theta:5.2, entryCredit:3.10, value:0.85, status:"open" },
-    { sym:"AMD",  strat:"Cash-secured put 150P", capital:15000, opened:mkDate(10), dteAtEntry:30, daysHeld:10,
-      delta:0.28, ivRank:33, gamma:0.020, theta:3.1, entryCredit:2.10, value:1.65, status:"open" },
-    { sym:"MSFT", strat:"Covered call 460C",     capital:45000, opened:mkDate(25), dteAtEntry:30, daysHeld:25,
-      delta:0.18, ivRank:29, gamma:0.008, theta:1.0, entryCredit:4.20, value:0.30, status:"open" },
-    { sym:"TSLA", strat:"Cash-secured put 300P", capital:30000, opened:mkDate(5),  dteAtEntry:40, daysHeld:5,
-      delta:0.38, ivRank:47, gamma:0.012, theta:4.4, entryCredit:6.80, value:6.10, status:"open" },
-    { sym:"NVDA", strat:"Covered call 180C",     capital:17200, opened:mkDate(33), dteAtEntry:35, daysHeld:33,
-      delta:0.12, ivRank:41, gamma:0.006, theta:0.4, entryCredit:3.40, value:0.05, status:"open" },
-    { sym:"QQQ",  strat:"Cash-secured put 480P", capital:24000, opened:mkDate(15), dteAtEntry:30, daysHeld:15,
-      delta:0.34, ivRank:36, gamma:0.014, theta:6.0, entryCredit:5.10, value:1.48, status:"closed", outcome:"profit" },
-    { sym:"JPM",  strat:"Cash-secured put 200P", capital:20000, opened:mkDate(35), dteAtEntry:35, daysHeld:35,
-      delta:0.22, ivRank:31, gamma:0.010, theta:3.8, entryCredit:2.85, value:0.00, status:"closed", outcome:"expired" },
-    { sym:"GOOGL",strat:"Cash-secured put 175P", capital:17500, opened:mkDate(22), dteAtEntry:30, daysHeld:22,
-      delta:0.30, ivRank:34, gamma:0.016, theta:4.0, entryCredit:2.40, value:1.08, status:"closed", outcome:"profit" },
+    { id:"t1", sym:"AAPL", strat:"Cash-secured put 220P", capital:22000, opened:mkDate(15), dteAtEntry:30,
+      delta:0.32, ivRank:38, gamma:0.015, theta:5.2, entryCredit:3.10, value:0.85, status:"open", closedDate:null, outcome:null },
+    { id:"t2", sym:"AMD",  strat:"Cash-secured put 150P", capital:15000, opened:mkDate(10), dteAtEntry:30,
+      delta:0.28, ivRank:33, gamma:0.020, theta:3.1, entryCredit:2.10, value:1.65, status:"open", closedDate:null, outcome:null },
+    { id:"t3", sym:"MSFT", strat:"Covered call 460C",     capital:45000, opened:mkDate(25), dteAtEntry:30,
+      delta:0.18, ivRank:29, gamma:0.008, theta:1.0, entryCredit:4.20, value:0.30, status:"open", closedDate:null, outcome:null },
+    { id:"t4", sym:"TSLA", strat:"Cash-secured put 300P", capital:30000, opened:mkDate(5),  dteAtEntry:40,
+      delta:0.38, ivRank:47, gamma:0.012, theta:4.4, entryCredit:6.80, value:6.10, status:"open", closedDate:null, outcome:null },
+    { id:"t5", sym:"NVDA", strat:"Covered call 180C",     capital:17200, opened:mkDate(33), dteAtEntry:35,
+      delta:0.12, ivRank:41, gamma:0.006, theta:0.4, entryCredit:3.40, value:0.05, status:"open", closedDate:null, outcome:null },
+    { id:"t6", sym:"QQQ",  strat:"Cash-secured put 480P", capital:24000, opened:mkDate(20), dteAtEntry:30,
+      delta:0.34, ivRank:36, gamma:0.014, theta:6.0, entryCredit:5.10, value:1.48, status:"closed", closedDate:mkDate(5), outcome:"profit" },
+    { id:"t7", sym:"JPM",  strat:"Cash-secured put 200P", capital:20000, opened:mkDate(40), dteAtEntry:35,
+      delta:0.22, ivRank:31, gamma:0.010, theta:3.8, entryCredit:2.85, value:0.00, status:"closed", closedDate:mkDate(5), outcome:"expired" },
+    { id:"t8", sym:"GOOGL",strat:"Cash-secured put 175P", capital:17500, opened:mkDate(30), dteAtEntry:30,
+      delta:0.30, ivRank:34, gamma:0.016, theta:4.0, entryCredit:2.40, value:1.08, status:"closed", closedDate:mkDate(8), outcome:"profit" },
   ];
 
   // stock lots acquired via CSP assignment. MSFT/NVDA/JPM already have an
@@ -588,13 +670,13 @@ function mockData() {
   // when the CC is in the money AND ex-div is close AND the dividend is
   // big enough to matter — JPM below is deliberately set up that way.
   const shareLots = [
-    { sym:"TSLA", shares:100, assignedStrike:290, assignPremium:4.50, currentPrice:318,
+    { id:"l1", sym:"TSLA", shares:100, assignedStrike:290, assignPremium:4.50, currentPrice:318,
       cc:null, exDiv:null },
-    { sym:"MSFT", shares:100, assignedStrike:450, assignPremium:3.10, currentPrice:452,
+    { id:"l2", sym:"MSFT", shares:100, assignedStrike:450, assignPremium:3.10, currentPrice:452,
       cc:{ strike:460, premium:4.20 }, exDiv:{ days:3, dividendPerShare:0.83 } },
-    { sym:"NVDA", shares:100, assignedStrike:175, assignPremium:2.60, currentPrice:172,
+    { id:"l3", sym:"NVDA", shares:100, assignedStrike:175, assignPremium:2.60, currentPrice:172,
       cc:{ strike:180, premium:3.40 }, exDiv:{ days:12, dividendPerShare:0.04 } },
-    { sym:"JPM",  shares:100, assignedStrike:195, assignPremium:3.20, currentPrice:214,
+    { id:"l4", sym:"JPM",  shares:100, assignedStrike:195, assignPremium:3.20, currentPrice:214,
       cc:{ strike:210, premium:2.80 }, exDiv:{ days:3, dividendPerShare:1.15 } },
   ];
 
@@ -602,9 +684,9 @@ function mockData() {
   // continuous trade rather than unrelated legs. netCredit = sum of every
   // leg's credit minus every roll's closing debit.
   const rollChains = [
-    { sym:"TSLA", underlyingType:"put", strikes:[320,300,290], credits:[5.20,8.10,5.90], debits:[6.80,3.50],
+    { id:"c1", sym:"TSLA", underlyingType:"put", strikes:[320,300,290], credits:[5.20,8.10,5.90], debits:[6.80,3.50],
       opened:mkDate(58), dte:35, status:"open" },
-    { sym:"AMD", underlyingType:"call", strikes:[145,155], credits:[2.20,3.90], debits:[4.80],
+    { id:"c2", sym:"AMD", underlyingType:"call", strikes:[145,155], credits:[2.20,3.90], debits:[4.80],
       opened:mkDate(40), dte:0, status:"assigned" },
   ];
 
@@ -617,6 +699,50 @@ function mockData() {
   };
 }
 const DATA = mockData();
+
+/* ---------- persistence: trades / roll chains / share lots ----------
+   Editable, saved to this browser's localStorage. First run seeds from
+   the mock data above so the demo still looks populated; from then on
+   edits persist across reloads. "Reset to demo data" clears back to it. */
+const PERSIST_KEYS = { trades:"wheelDashTrades", rollChains:"wheelDashRollChains", shareLots:"wheelDashShareLots" };
+const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+function tradeDaysHeld(t) {
+  const end = t.status === "closed" && t.closedDate ? t.closedDate : new Date();
+  return Math.max(0, Math.round((end - t.opened) / 86400000));
+}
+
+function loadPersisted(key, dateFields) {
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  try {
+    const arr = JSON.parse(raw);
+    for (const item of arr) for (const f of dateFields) if (item[f]) item[f] = new Date(item[f]);
+    return arr;
+  } catch { return null; }
+}
+function savePersisted(key, arr) { localStorage.setItem(key, JSON.stringify(arr)); }
+
+function saveTrades()     { savePersisted(PERSIST_KEYS.trades, DATA.trades); }
+function saveRollChains() { savePersisted(PERSIST_KEYS.rollChains, DATA.rollChains); }
+function saveShareLots()  { savePersisted(PERSIST_KEYS.shareLots, DATA.shareLots); }
+
+(function loadOrSeed() {
+  const t = loadPersisted(PERSIST_KEYS.trades, ["opened","closedDate"]);
+  const c = loadPersisted(PERSIST_KEYS.rollChains, ["opened"]);
+  const l = loadPersisted(PERSIST_KEYS.shareLots, []);
+  if (t) DATA.trades = t; else saveTrades();
+  if (c) DATA.rollChains = c; else saveRollChains();
+  if (l) DATA.shareLots = l; else saveShareLots();
+})();
+
+function resetToDemoData() {
+  if (!confirm("Reset trades, roll chains, and share lots back to the demo data? This clears anything you've added or edited.")) return;
+  localStorage.removeItem(PERSIST_KEYS.trades);
+  localStorage.removeItem(PERSIST_KEYS.rollChains);
+  localStorage.removeItem(PERSIST_KEYS.shareLots);
+  location.reload();
+}
 
 /* ---------- formatting helpers ---------- */
 const fmt$  = n => (n<0?"-$":"$") + Math.abs(n).toLocaleString("en-US");
@@ -1144,8 +1270,9 @@ function renderScorecard() {
   const closedStats = closed.map(t => {
     const profit = (t.entryCredit - t.value) * 100;
     const cocr = (t.entryCredit * 100) / t.capital * 100;
-    const cocrAnn = cocr / Math.max(t.daysHeld, 1) * 365;
-    return { profit, cocr, cocrAnn, daysHeld: t.daysHeld };
+    const daysHeld = tradeDaysHeld(t);
+    const cocrAnn = cocr / Math.max(daysHeld, 1) * 365;
+    return { profit, cocr, cocrAnn, daysHeld };
   });
   const avg = arr => arr.length ? arr.reduce((s,v) => s+v, 0) / arr.length : 0;
 
@@ -1194,9 +1321,24 @@ function actionBadgeCell(status) {
   td.append(span);
   return td;
 }
+function rowActionsCell(buttons) {
+  const td = document.createElement("td");
+  const wrap = document.createElement("div"); wrap.className = "row-actions";
+  for (const b of buttons) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "row-btn" + (b.danger ? " danger" : "");
+    btn.textContent = b.label;
+    btn.addEventListener("click", b.onClick);
+    wrap.append(btn);
+  }
+  td.append(wrap);
+  return td;
+}
 
 function renderTracker() {
   const tb = document.querySelector("#tracker tbody");
+  tb.textContent = "";
   for (const t of DATA.trades) {
     const tr = document.createElement("tr");
 
@@ -1208,7 +1350,8 @@ function renderTracker() {
 
     tr.append(badgeCell(t.dteAtEntry + "d", dteEntryStatus(t.dteAtEntry)));
 
-    const heldTd = document.createElement("td"); heldTd.textContent = t.daysHeld + "d";
+    const daysHeld = tradeDaysHeld(t);
+    const heldTd = document.createElement("td"); heldTd.textContent = daysHeld + "d";
     tr.append(heldTd);
 
     tr.append(badgeCell(t.delta.toFixed(2), deltaChecklistStatus(t.delta)));
@@ -1220,7 +1363,7 @@ function renderTracker() {
     const profit = (t.entryCredit - t.value) * 100; // premium received − closing cost (0 if expired worthless)
     const captured = profit / maxProfit;
     const cocr = maxProfit / t.capital * 100;        // premium received ÷ capital required
-    const cocrAnn = cocr / Math.max(t.daysHeld, 1) * 365; // capital velocity — ranks fast cycles fairly
+    const cocrAnn = cocr / Math.max(daysHeld, 1) * 365; // capital velocity — ranks fast cycles fairly
 
     const maxTd = document.createElement("td"); maxTd.textContent = fmt$(Math.round(maxProfit));
     const profitTd = document.createElement("td"); profitTd.textContent = fmt$(Math.round(profit));
@@ -1239,7 +1382,7 @@ function renderTracker() {
     } else if (captured >= 0.90) {
       action = ["good","✓","Let it expire"];
     } else if (captured >= 0.70) {
-      const fast = t.daysHeld <= t.dteAtEntry * 0.5;
+      const fast = daysHeld <= t.dteAtEntry * 0.5;
       action = ["good","✓", fast ? "Take profit ⚡ fast cycle" : "Take profit"];
     } else if (captured >= 0.50) {
       action = ["warn","~","Consider closing"];
@@ -1248,8 +1391,50 @@ function renderTracker() {
     }
     tr.append(actionBadgeCell(action));
 
+    const buttons = [];
+    if (t.status === "open") {
+      buttons.push({ label:"Mark", onClick: () => updateTradeValue(t.id) });
+      buttons.push({ label:"Close", onClick: () => closeTrade(t.id) });
+    }
+    buttons.push({ label:"Delete", danger:true, onClick: () => deleteTrade(t.id) });
+    tr.append(rowActionsCell(buttons));
+
     tb.append(tr);
   }
+}
+
+function updateTradeValue(id) {
+  const t = DATA.trades.find(x => x.id === id);
+  if (!t) return;
+  const input = prompt(`Current option value for ${t.sym} (${t.strat})\nPer-share price, e.g. 1.25:`, t.value);
+  if (input === null) return;
+  const v = parseFloat(input);
+  if (!Number.isFinite(v) || v < 0) { alert("Enter a valid non-negative number."); return; }
+  t.value = v;
+  saveTrades();
+  renderTracker(); renderScorecard(); renderCapital();
+}
+function closeTrade(id) {
+  const t = DATA.trades.find(x => x.id === id);
+  if (!t) return;
+  const input = prompt(`Close ${t.sym} (${t.strat})\nClosing value per share (0 if expired worthless):`, "0");
+  if (input === null) return;
+  const v = parseFloat(input);
+  if (!Number.isFinite(v) || v < 0) { alert("Enter a valid non-negative number."); return; }
+  t.value = v;
+  t.status = "closed";
+  t.closedDate = new Date();
+  t.outcome = v <= 0 ? "expired" : "profit";
+  saveTrades();
+  renderTracker(); renderScorecard(); renderCapital();
+}
+function deleteTrade(id) {
+  const t = DATA.trades.find(x => x.id === id);
+  if (!t) return;
+  if (!confirm(`Delete ${t.sym} (${t.strat}) from the tracker? This can't be undone.`)) return;
+  DATA.trades = DATA.trades.filter(x => x.id !== id);
+  saveTrades();
+  renderTracker(); renderScorecard(); renderCapital();
 }
 
 /* ---------- share lots: avg cost basis + total return on assignment ---------- */
@@ -1306,13 +1491,60 @@ function renderShareLots() {
     tr.append(exDivTd);
     tr.append(actionBadgeCell(exDivRiskStatus(l)));
 
+    tr.append(rowActionsCell([
+      { label: l0.cc ? "Update CC" : "Write CC", onClick: () => writeCallOnLot(l0.id) },
+      { label: "Set ex-div", onClick: () => setLotExDiv(l0.id) },
+      { label: "Delete", danger:true, onClick: () => deleteLot(l0.id) },
+    ]));
+
     tb.append(tr);
   }
+}
+
+function writeCallOnLot(id) {
+  const l = DATA.shareLots.find(x => x.id === id);
+  if (!l) return;
+  const strikeInput = prompt(`Covered call strike for ${l.sym}:`, l.cc ? l.cc.strike : "");
+  if (strikeInput === null) return;
+  const strike = parseFloat(strikeInput);
+  if (!Number.isFinite(strike) || strike <= 0) { alert("Enter a valid strike."); return; }
+  const premiumInput = prompt("Premium received per share:", l.cc ? l.cc.premium : "");
+  if (premiumInput === null) return;
+  const premium = parseFloat(premiumInput);
+  if (!Number.isFinite(premium) || premium < 0) { alert("Enter a valid non-negative number."); return; }
+  l.cc = { strike, premium };
+  saveShareLots();
+  renderShareLots();
+}
+function setLotExDiv(id) {
+  const l = DATA.shareLots.find(x => x.id === id);
+  if (!l) return;
+  const daysInput = prompt(`Days until next ex-div for ${l.sym} (blank to clear):`, l.exDiv ? l.exDiv.days : "");
+  if (daysInput === null) return;
+  if (daysInput.trim() === "") { l.exDiv = null; saveShareLots(); renderShareLots(); return; }
+  const days = parseFloat(daysInput);
+  if (!Number.isFinite(days) || days < 0) { alert("Enter a valid non-negative number."); return; }
+  const divInput = prompt("Dividend per share:", l.exDiv ? l.exDiv.dividendPerShare : "");
+  if (divInput === null) return;
+  const dividendPerShare = parseFloat(divInput);
+  if (!Number.isFinite(dividendPerShare) || dividendPerShare < 0) { alert("Enter a valid non-negative number."); return; }
+  l.exDiv = { days, dividendPerShare };
+  saveShareLots();
+  renderShareLots();
+}
+function deleteLot(id) {
+  const l = DATA.shareLots.find(x => x.id === id);
+  if (!l) return;
+  if (!confirm(`Delete the ${l.sym} share lot? This can't be undone.`)) return;
+  DATA.shareLots = DATA.shareLots.filter(x => x.id !== id);
+  saveShareLots();
+  renderShareLots();
 }
 
 /* ---------- roll chains: multi-leg positions tracked as one ---------- */
 function renderRollChains() {
   const tb = document.querySelector("#chains tbody");
+  tb.textContent = "";
   const today = new Date();
   for (const c of DATA.rollChains) {
     const netCredit = c.credits.reduce((s,v) => s+v, 0) - c.debits.reduce((s,v) => s+v, 0);
@@ -1341,8 +1573,61 @@ function renderRollChains() {
       : ["good","✓","Closed"];
     tr.append(actionBadgeCell(statusLabel));
 
+    const buttons = [];
+    if (c.status === "open") {
+      buttons.push({ label:"Roll", onClick: () => rollChain(c.id) });
+      buttons.push({ label:"Close", onClick: () => closeChain(c.id) });
+    }
+    buttons.push({ label:"Delete", danger:true, onClick: () => deleteChain(c.id) });
+    tr.append(rowActionsCell(buttons));
+
     tb.append(tr);
   }
+}
+
+function rollChain(id) {
+  const c = DATA.rollChains.find(x => x.id === id);
+  if (!c) return;
+  const currentStrike = c.strikes[c.strikes.length-1];
+  const debitInput = prompt(`Roll ${c.sym} ${c.underlyingType} — closing debit per share to buy back the ${fmt$2(currentStrike)} leg:`, "0");
+  if (debitInput === null) return;
+  const debit = parseFloat(debitInput);
+  if (!Number.isFinite(debit) || debit < 0) { alert("Enter a valid non-negative number."); return; }
+
+  const strikeInput = prompt("New strike:", currentStrike);
+  if (strikeInput === null) return;
+  const strike = parseFloat(strikeInput);
+  if (!Number.isFinite(strike) || strike <= 0) { alert("Enter a valid strike."); return; }
+
+  const creditInput = prompt("New credit received per share:", "0");
+  if (creditInput === null) return;
+  const credit = parseFloat(creditInput);
+  if (!Number.isFinite(credit) || credit < 0) { alert("Enter a valid non-negative number."); return; }
+
+  c.debits.push(debit);
+  c.strikes.push(strike);
+  c.credits.push(credit);
+  saveRollChains();
+  renderRollChains();
+}
+function closeChain(id) {
+  const c = DATA.rollChains.find(x => x.id === id);
+  if (!c) return;
+  const input = prompt(`Close ${c.sym} chain — type "assigned" or "closed":`, "assigned");
+  if (input === null) return;
+  const status = input.trim().toLowerCase();
+  if (status !== "assigned" && status !== "closed") { alert('Enter "assigned" or "closed".'); return; }
+  c.status = status;
+  saveRollChains();
+  renderRollChains();
+}
+function deleteChain(id) {
+  const c = DATA.rollChains.find(x => x.id === id);
+  if (!c) return;
+  if (!confirm(`Delete the ${c.sym} roll chain? This can't be undone.`)) return;
+  DATA.rollChains = DATA.rollChains.filter(x => x.id !== id);
+  saveRollChains();
+  renderRollChains();
 }
 
 /* ---------- capital & allocation ---------- */
@@ -1484,8 +1769,8 @@ renderPayoff("ironCondor");
 
 setInterval(renderClock, 1000);
 
-document.querySelectorAll(".range-btn").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll(".range-btn").forEach(x=>x.setAttribute("aria-pressed","false"));
+document.querySelectorAll(".filters .range-btn").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".filters .range-btn").forEach(x=>x.setAttribute("aria-pressed","false"));
   b.setAttribute("aria-pressed","true");
   currentRange = +b.dataset.days;
   renderPnl(currentRange);
@@ -1521,6 +1806,101 @@ document.getElementById("td-disconnect").addEventListener("click", () => {
   fetchLiveData();
 });
 if (savedTdKey) fetchLiveData();
+
+// reset to demo data
+document.getElementById("reset-demo-data").addEventListener("click", resetToDemoData);
+
+// add-trade form
+const tradeForm = document.getElementById("trade-add-form");
+document.getElementById("trade-add-toggle").addEventListener("click", () => {
+  tradeForm.classList.toggle("open");
+  if (tradeForm.classList.contains("open")) document.getElementById("ta-opened").valueAsDate = new Date();
+});
+document.getElementById("ta-cancel").addEventListener("click", () => tradeForm.classList.remove("open"));
+document.getElementById("ta-submit").addEventListener("click", () => {
+  const sym = document.getElementById("ta-sym").value.trim().toUpperCase();
+  const strat = document.getElementById("ta-strat").value.trim();
+  const capital = parseFloat(document.getElementById("ta-capital").value);
+  const openedVal = document.getElementById("ta-opened").valueAsDate;
+  const dteAtEntry = parseFloat(document.getElementById("ta-dte").value);
+  const delta = parseFloat(document.getElementById("ta-delta").value);
+  const ivRank = parseFloat(document.getElementById("ta-ivrank").value);
+  const gamma = parseFloat(document.getElementById("ta-gamma").value);
+  const theta = parseFloat(document.getElementById("ta-theta").value);
+  const entryCredit = parseFloat(document.getElementById("ta-credit").value);
+
+  if (!sym || !strat || ![capital, dteAtEntry, delta, ivRank, gamma, theta, entryCredit].every(Number.isFinite) || !openedVal) {
+    alert("Fill in every field with a valid value before adding the trade.");
+    return;
+  }
+
+  DATA.trades.push({
+    id: genId(), sym, strat, capital, opened: openedVal, dteAtEntry,
+    delta, ivRank, gamma, theta, entryCredit, value: entryCredit,
+    status: "open", closedDate: null, outcome: null,
+  });
+  saveTrades();
+  renderTracker(); renderScorecard(); renderCapital();
+
+  for (const id of ["ta-sym","ta-strat","ta-capital","ta-dte","ta-delta","ta-ivrank","ta-gamma","ta-theta","ta-credit"])
+    document.getElementById(id).value = "";
+  tradeForm.classList.remove("open");
+});
+
+// add-chain form
+const chainForm = document.getElementById("chain-add-form");
+document.getElementById("chain-add-toggle").addEventListener("click", () => {
+  chainForm.classList.toggle("open");
+  if (chainForm.classList.contains("open")) document.getElementById("ca-opened").valueAsDate = new Date();
+});
+document.getElementById("ca-cancel").addEventListener("click", () => chainForm.classList.remove("open"));
+document.getElementById("ca-submit").addEventListener("click", () => {
+  const sym = document.getElementById("ca-sym").value.trim().toUpperCase();
+  const underlyingType = document.getElementById("ca-type").value;
+  const strike = parseFloat(document.getElementById("ca-strike").value);
+  const credit = parseFloat(document.getElementById("ca-credit").value);
+  const openedVal = document.getElementById("ca-opened").valueAsDate;
+  const dte = parseFloat(document.getElementById("ca-dte").value);
+
+  if (!sym || ![strike, credit, dte].every(Number.isFinite) || !openedVal) {
+    alert("Fill in every field with a valid value before adding the chain.");
+    return;
+  }
+
+  DATA.rollChains.push({
+    id: genId(), sym, underlyingType, strikes:[strike], credits:[credit], debits:[],
+    opened: openedVal, dte, status: "open",
+  });
+  saveRollChains();
+  renderRollChains();
+
+  for (const id of ["ca-sym","ca-strike","ca-credit","ca-dte"]) document.getElementById(id).value = "";
+  chainForm.classList.remove("open");
+});
+
+// add-lot form
+const lotForm = document.getElementById("lot-add-form");
+document.getElementById("lot-add-toggle").addEventListener("click", () => lotForm.classList.toggle("open"));
+document.getElementById("la-cancel").addEventListener("click", () => lotForm.classList.remove("open"));
+document.getElementById("la-submit").addEventListener("click", () => {
+  const sym = document.getElementById("la-sym").value.trim().toUpperCase();
+  const shares = parseFloat(document.getElementById("la-shares").value);
+  const assignedStrike = parseFloat(document.getElementById("la-strike").value);
+  const assignPremium = parseFloat(document.getElementById("la-premium").value);
+  const currentPrice = parseFloat(document.getElementById("la-price").value);
+
+  if (!sym || ![shares, assignedStrike, assignPremium, currentPrice].every(Number.isFinite)) {
+    alert("Fill in every field with a valid value before adding the lot.");
+    return;
+  }
+
+  DATA.shareLots.push({ id: genId(), sym, shares, assignedStrike, assignPremium, currentPrice, cc: null, exDiv: null });
+  saveShareLots();
+  renderShareLots();
+
+  for (const id of ["la-sym","la-shares","la-strike","la-premium","la-price"]) document.getElementById(id).value = "";
+  lotForm.classList.remove("open");
+});
 
 // re-render charts on resize / theme change
 let rt; window.addEventListener("resize", () => {
