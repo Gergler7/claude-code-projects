@@ -347,7 +347,7 @@
   <span class="live-status" id="td-status">Not connected — showing mock data</span>
   <a class="live-link" href="https://twelvedata.com/pricing" target="_blank" rel="noopener noreferrer">Get a free key ↗</a>
 </div>
-<p class="live-note">Your key is saved only in this browser (localStorage) — never sent anywhere but twelvedata.com, and never committed to this repo. Covers VIX, stock prices, and volume; IV, open interest, spreads, and greeks stay mock/manual (not available from a basic quotes API). On the free tier a full refresh is paced in small batches to stay under the rate limit, so it can take a couple of minutes — the status line tracks progress.</p>
+<p class="live-note">Your key is saved only in this browser (localStorage) — never sent anywhere but twelvedata.com, and never committed to this repo. Covers stock prices and volume; VIX, IV, open interest, spreads, and greeks stay mock/manual (VIX isn't in Twelve Data's symbol database at any tier; the rest isn't available from a basic quotes API). On the free tier a full refresh is paced in small batches to stay under the rate limit, so it can take a couple of minutes — the status line tracks progress.</p>
 
 <div class="grid">
 
@@ -357,7 +357,7 @@
   <!-- VIX conditions -->
   <section class="card span-12">
     <h2>VIX — is it a good time to sell premium?</h2>
-    <div class="h2sub">CBOE Volatility Index · your bands: 10–15 calm, 15–20 normal, 25–40 high (good premiums)</div>
+    <div class="h2sub">CBOE Volatility Index · your bands: 10–15 calm, 15–20 normal, 25–40 high (good premiums) · always manual — VIX isn't available through Twelve Data at any plan tier, update it yourself in mockData()</div>
     <div class="vix-flex">
       <div class="vix-value-block">
         <div class="vix-value" id="vix-value">—</div>
@@ -782,7 +782,7 @@ let liveData = { connected:false, quotes:{}, vix:null, lastFetch:null, error:nul
 function updateDataBadge() {
   const badge = document.getElementById("data-badge");
   if (liveData.connected) {
-    badge.textContent = liveData.vix !== null ? "LIVE DATA" : "LIVE DATA · PARTIAL";
+    badge.textContent = "LIVE DATA";
     badge.classList.add("live");
   } else {
     badge.textContent = "TEMPLATE · MOCK DATA";
@@ -801,8 +801,12 @@ async function fetchLiveData() {
     return;
   }
 
-  const symbols = [...new Set(DATA.screener.map(s => s.sym))];
-  const allSymbols = [...symbols, "VIX"];
+  // VIX isn't in Twelve Data's symbol database (confirmed via their own
+  // symbol_search and indices reference lists) - only VIX-tracking ETFs
+  // like VIXY/VXX exist there, and those trade at a completely different
+  // price scale (futures decay), so they can't substitute for the index.
+  // VIX always stays mock/manual regardless of connection.
+  const allSymbols = [...new Set(DATA.screener.map(s => s.sym))];
 
   // Free tier caps at 8 credits/minute. Confirmed live: a 7-symbol batch
   // was rejected citing "14 credits used" — quote calls appear to cost
@@ -813,7 +817,6 @@ async function fetchLiveData() {
   for (let i = 0; i < allSymbols.length; i += CHUNK) chunks.push(allSymbols.slice(i, i + CHUNK));
 
   const quotes = {};
-  let vix = null;
   let lastError = null;
 
   for (let i = 0; i < chunks.length; i++) {
@@ -832,8 +835,7 @@ async function fetchLiveData() {
         const price = parseFloat(q.close);
         const volume = q.average_volume ? parseFloat(q.average_volume) : parseFloat(q.volume);
         if (!Number.isFinite(price)) continue;
-        if (sym === "VIX") vix = price;
-        else quotes[sym] = { price, volume: Number.isFinite(volume) ? volume : null };
+        quotes[sym] = { price, volume: Number.isFinite(volume) ? volume : null };
       }
     } catch (err) {
       lastError = err.message; // a failed chunk doesn't discard symbols already fetched
@@ -850,10 +852,9 @@ async function fetchLiveData() {
     statusEl.textContent = "Error: " + lastError + " — showing mock data";
     statusEl.className = "live-status err";
   } else {
-    liveData = { connected:true, quotes, vix, lastFetch:new Date(), error:lastError };
+    liveData = { connected:true, quotes, vix:null, lastFetch:new Date(), error:lastError };
     statusEl.textContent = `Connected — live as of ${liveData.lastFetch.toLocaleTimeString()}` +
-      (vix === null ? " · VIX unavailable, using mock" : "") +
-      (gotCount < symbols.length ? ` · ${gotCount}/${symbols.length} symbols resolved` : "") +
+      (gotCount < allSymbols.length ? ` · ${gotCount}/${allSymbols.length} symbols resolved` : "") +
       (lastError ? ` · note: ${lastError}` : "");
     statusEl.className = "live-status ok";
   }
@@ -919,12 +920,11 @@ function vixZone(v) {
   return { name: "Extreme", note: "above 40 · outsized risk", swatch: "--bad-text" };
 }
 function renderVix() {
-  const v = liveData.vix !== null ? liveData.vix : DATA.vix;
+  const v = DATA.vix; // VIX isn't available via Twelve Data at any tier — always manual/mock
   const zone = vixZone(v);
   document.getElementById("vix-value").textContent = v.toFixed(1);
   document.getElementById("vix-dot").style.background = css(zone.swatch);
-  document.getElementById("vix-zone-text").textContent = `${zone.name} — ${zone.note}` +
-    (liveData.connected && liveData.vix === null ? " (mock — VIX unavailable)" : "");
+  document.getElementById("vix-zone-text").textContent = `${zone.name} — ${zone.note}`;
 
   const svg = document.getElementById("vix-meter");
   svg.textContent = "";
